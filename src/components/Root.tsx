@@ -1,7 +1,7 @@
 import { OrbitControls } from '@react-three/drei'
 import { Canvas, useLoader } from '@react-three/fiber'
 import { useRef, useState } from 'react'
-import { Mesh } from 'three'
+import { Mesh, sRGBEncoding } from 'three'
 import { TextureLoader } from 'three/src/loaders/TextureLoader.js'
 
 function Box(props: any) {
@@ -25,6 +25,13 @@ function Box(props: any) {
     const texRight = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/right.png')
     const texTop = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/top.png')
     const texBottom = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/bottom.png')
+
+    texFront.encoding = sRGBEncoding
+    texBack.encoding = sRGBEncoding
+    texTop.encoding = sRGBEncoding
+    texBottom.encoding = sRGBEncoding
+    texLeft.encoding = sRGBEncoding
+    texRight.encoding = sRGBEncoding
 
     const roughDimensions = [6100, 3800, 400]
 
