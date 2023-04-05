@@ -35,12 +35,10 @@ function Box(props: any) {
 
     const roughDimensions = [6100, 3800, 400]
 
-    // Return the view, these are regular Threejs elements expressed in JSX
     return (
         <mesh
             {...props}
             ref={ref}
-            // scale={clicked ? 1.5 : 1}
             onClick={() => click(!clicked)}
             onPointerOver={() => hover(true)}
             onPointerOut={() => hover(false)}
@@ -64,7 +62,7 @@ const Root: React.FC = () => {
                 <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
                 <pointLight position={[-10, -10, -10]} />
                 <Box position={[0, 0, 0]} />
-                <OrbitControls />
+                <OrbitControls enablePan={true} minDistance={0.5} maxDistance={16} />
             </Canvas>
         </div>
     )
