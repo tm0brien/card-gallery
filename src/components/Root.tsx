@@ -1,7 +1,7 @@
 import { OrbitControls } from '@react-three/drei'
 import { Canvas, useLoader } from '@react-three/fiber'
 import { useRef, useState } from 'react'
-import { Mesh, sRGBEncoding } from 'three'
+import { Mesh } from 'three'
 import { TextureLoader } from 'three/src/loaders/TextureLoader.js'
 
 function Box(props: any) {
@@ -26,12 +26,10 @@ function Box(props: any) {
     const texTop = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/top.png')
     const texBottom = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/bottom.png')
 
-    texFront.encoding = sRGBEncoding
-    texBack.encoding = sRGBEncoding
-    texTop.encoding = sRGBEncoding
-    texBottom.encoding = sRGBEncoding
-    texLeft.encoding = sRGBEncoding
-    texRight.encoding = sRGBEncoding
+    const textures = [texFront, texBack, texTop, texBottom, texLeft, texRight]
+    textures.forEach(texture => {
+        texture.colorSpace = 'srgb'
+    })
 
     const roughDimensions = [6100, 3800, 400]
 
@@ -58,9 +56,9 @@ const Root: React.FC = () => {
     return (
         <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
             <Canvas>
-                <ambientLight intensity={0.1} />
-                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
-                <pointLight position={[-10, -10, -10]} />
+                <ambientLight intensity={1.8} />
+                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1.5} />
+                <pointLight position={[-10, -10, -10]} intensity={1} />
                 <Box position={[0, 0, 0]} />
                 <OrbitControls enablePan={true} minDistance={0.5} maxDistance={16} />
             </Canvas>
