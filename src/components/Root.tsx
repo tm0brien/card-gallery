@@ -1,23 +1,16 @@
-import { OrbitControls } from '@react-three/drei/core/OrbitControls'
+import { OrbitControls } from '@react-three/drei'
 import { Canvas, useLoader } from '@react-three/fiber'
 import { useRef, useState } from 'react'
-import { Mesh } from 'three/src/objects/Mesh'
 import { TextureLoader } from 'three/src/loaders/TextureLoader.js'
+import { Mesh } from 'three/src/objects/Mesh'
 
 function Box(props: any) {
     // This reference gives us direct access to the THREE.Mesh object
-    const ref = useRef<Mesh>()
+    const ref = useRef<Mesh>(null)
 
     // Hold state for hovered and clicked events
     const [, hover] = useState(false)
     const [clicked, click] = useState(false)
-
-    // // Subscribe this component to the render-loop, rotate the mesh every frame
-    // useFrame((state, delta) => {
-    //     if (ref.current) {
-    //         ref.current.rotation.x += 0
-    //     }
-    // })
 
     const texFront = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/front.png')
     const texBack = useLoader(TextureLoader, 'assets/1955-aaron-bowman-bgs-55/back.png')
@@ -42,22 +35,22 @@ function Box(props: any) {
             onPointerOut={() => hover(false)}
         >
             <boxGeometry args={[roughDimensions[0] / 1600, roughDimensions[1] / 1600, roughDimensions[2] / 1600]} />
-            <meshStandardMaterial attach={`material-0`} >
+            <meshStandardMaterial attach={`material-0`}>
                 <primitive attach="map" object={texTop} />
             </meshStandardMaterial>
-            <meshStandardMaterial attach={`material-1`} >
+            <meshStandardMaterial attach={`material-1`}>
                 <primitive attach="map" object={texBottom} />
             </meshStandardMaterial>
-            <meshStandardMaterial attach={`material-2`} >
+            <meshStandardMaterial attach={`material-2`}>
                 <primitive attach="map" object={texLeft} />
             </meshStandardMaterial>
-            <meshStandardMaterial attach={`material-3`} >
+            <meshStandardMaterial attach={`material-3`}>
                 <primitive attach="map" object={texRight} />
             </meshStandardMaterial>
             <meshStandardMaterial attach={`material-4`}>
-                <color attach="color" args={['white']} />
+                <primitive attach="map" object={texFront} />
             </meshStandardMaterial>
-            <meshStandardMaterial attach={`material-5`} >
+            <meshStandardMaterial attach={`material-5`}>
                 <primitive attach="map" object={texBack} />
             </meshStandardMaterial>
         </mesh>
