@@ -1,7 +1,7 @@
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei/core/OrbitControls'
 import { Canvas, useLoader } from '@react-three/fiber'
 import { useRef, useState } from 'react'
-import { Mesh } from 'three'
+import { Mesh } from 'three/src/objects/Mesh'
 import { TextureLoader } from 'three/src/loaders/TextureLoader.js'
 
 function Box(props: any) {
@@ -42,12 +42,24 @@ function Box(props: any) {
             onPointerOut={() => hover(false)}
         >
             <boxGeometry args={[roughDimensions[0] / 1600, roughDimensions[1] / 1600, roughDimensions[2] / 1600]} />
-            <meshStandardMaterial map={texTop} attach="material-0" />
-            <meshStandardMaterial map={texBottom} attach="material-1" />
-            <meshStandardMaterial map={texLeft} attach="material-2" />
-            <meshStandardMaterial map={texRight} attach="material-3" />
-            <meshStandardMaterial map={texFront} attach="material-4" color={'white'} />
-            <meshStandardMaterial map={texBack} attach="material-5" />
+            <meshStandardMaterial attach={`material-0`} >
+                <primitive attach="map" object={texTop} />
+            </meshStandardMaterial>
+            <meshStandardMaterial attach={`material-1`} >
+                <primitive attach="map" object={texBottom} />
+            </meshStandardMaterial>
+            <meshStandardMaterial attach={`material-2`} >
+                <primitive attach="map" object={texLeft} />
+            </meshStandardMaterial>
+            <meshStandardMaterial attach={`material-3`} >
+                <primitive attach="map" object={texRight} />
+            </meshStandardMaterial>
+            <meshStandardMaterial attach={`material-4`}>
+                <color attach="color" args={['white']} />
+            </meshStandardMaterial>
+            <meshStandardMaterial attach={`material-5`} >
+                <primitive attach="map" object={texBack} />
+            </meshStandardMaterial>
         </mesh>
     )
 }
