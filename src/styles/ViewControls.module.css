@@ -1,0 +1,111 @@
+/* ============================================
+   View Controls
+   ============================================ */
+
+.container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  z-index: 50;
+  opacity: 0.5;
+  transition: opacity var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+}
+
+.container:hover,
+.container.hovered {
+  opacity: 1;
+}
+
+.button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--panel-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-duration) var(--transition-easing);
+}
+
+.button:hover:not(:disabled) {
+  background: rgba(255, 248, 240, 0.06);
+  border-color: rgba(255, 248, 240, 0.1);
+  color: var(--panel-text-primary);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Tooltip on hover */
+.button::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: rgba(30, 25, 20, 0.9);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--panel-text-primary);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-duration) var(--transition-easing),
+              transform var(--transition-duration) var(--transition-easing);
+  margin-bottom: 8px;
+}
+
+.button:hover::after {
+  opacity: 1;
+}
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .container {
+    bottom: auto;
+    top: 16px;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .button svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .button::after {
+    display: none;
+  }
+}

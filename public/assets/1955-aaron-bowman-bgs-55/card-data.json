@@ -1,0 +1,21 @@
+{
+  "title": "1955 Bowman",
+  "player": "Hank Aaron",
+  "year": "1955",
+  "set": "Bowman",
+  "cardNumber": "179",
+  "team": "Milwaukee Braves",
+  "grade": {
+    "company": "BGS",
+    "score": "5.5",
+    "label": "EX+",
+    "subgrades": {
+      "centering": "6",
+      "corners": "5",
+      "edges": "5.5",
+      "surface": "6"
+    }
+  },
+  "certificationNumber": "0012345678",
+  "notes": "Light corner wear, excellent surface preservation. Second-year card of the legendary Hank Aaron."
+}
