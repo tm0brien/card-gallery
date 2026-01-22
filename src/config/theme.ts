@@ -140,18 +140,18 @@ export const galleryTheme: ThemeConfig = {
         filmGrainAnimated: true
     },
     lighting: {
-        ambientIntensity: 1.5,
+        ambientIntensity: 0.7,
         ambientColor: '#ffffff',
-        keyIntensity: 0.3,
+        keyIntensity: 0.8,
         keyColor: '#ffffff',
-        keyPosition: [0, 2, 5],
-        fillIntensity: 0.15,
+        keyPosition: [-2, 3, 5],
+        fillIntensity: 0.4,
         fillColor: '#ffffff',
-        fillPosition: [-4, 1, 2],
-        rimIntensity: 0.15,
+        fillPosition: [3, 1, 3],
+        rimIntensity: 0.3,
         rimColor: '#ffffff',
-        rimPosition: [4, 1, 2],
-        envMapIntensity: 0.3
+        rimPosition: [3, 2, -2],
+        envMapIntensity: 0.15
     },
     shadow: {
         opacity: 0.25,
@@ -174,11 +174,11 @@ export const galleryTheme: ThemeConfig = {
         idleDelay: 3000
     },
     material: {
-        roughness: 0.5,
+        roughness: 0.4,
         metalness: 0,
-        clearcoat: 0,
-        clearcoatRoughness: 0,
-        envMapIntensity: 0.3,
+        clearcoat: 0.2,
+        clearcoatRoughness: 0.4,
+        envMapIntensity: 0.15,
         normalScale: 0
     },
     ui: {
@@ -198,41 +198,41 @@ export const galleryTheme: ThemeConfig = {
 export const cozyTheme: ThemeConfig = {
     name: 'cozy',
     background: {
-        // Warm parchment/bone tones
-        gradientCenter: '#f7f3ed', // Warm cream center
-        gradientMid: '#ede8e0', // Soft parchment
-        gradientEdge: '#d9d2c7', // Warm taupe edges
-        vignetteOpacity: 0.35, // Slightly stronger vignette
-        vignetteStart: 25, // Earlier vignette start
-        textureOpacity: 0.04, // Barely perceptible linen texture
-        filmGrainOpacity: 0.025, // Subtle film grain
+        // Dark den/library atmosphere
+        gradientCenter: '#2a2520', // Dark warm brown (illuminated center)
+        gradientMid: '#1e1a16', // Deep brown
+        gradientEdge: '#12100e', // Near-black edges
+        vignetteOpacity: 0.6, // Stronger vignette for "room darkness"
+        vignetteStart: 15, // Earlier vignette = more peripheral darkness
+        textureOpacity: 0.03, // Subtle texture
+        filmGrainOpacity: 0.04, // Slightly more grain for warmth
         filmGrainAnimated: false // Static grain (no swimming)
     },
     lighting: {
-        // Ambient - slightly warm
-        ambientIntensity: 0.8,
-        ambientColor: '#fff8f0', // Warm white
-        // Key light - warm, upper-left/front, soft
-        keyIntensity: 0.7,
-        keyColor: '#fff4e6', // Warm incandescent
-        keyPosition: [-3, 4, 5],
-        // Fill light - neutral/warm, lower intensity
-        fillIntensity: 0.3,
-        fillColor: '#fff9f2', // Slightly warm
-        fillPosition: [3, 0, 3],
-        // Rim light - faint, back-right for edge definition
-        rimIntensity: 0.25,
-        rimColor: '#ffe8d6', // Warm highlight
-        rimPosition: [4, 2, -3],
-        // Environment map intensity (clamped for plastic, not chrome)
-        envMapIntensity: 0.15
+        // Ambient - very dim, warm (simulates dark room)
+        ambientIntensity: 0.3,
+        ambientColor: '#3d3020', // Warm dark amber ambient
+        // Key light - desk lamp effect, warm and focused
+        keyIntensity: 1.2,
+        keyColor: '#ffcc80', // Warm incandescent orange
+        keyPosition: [-2, 3, 4],
+        // Fill light - soft secondary lamp
+        fillIntensity: 0.4,
+        fillColor: '#ffd9a0', // Warm fill
+        fillPosition: [3, 1, 3],
+        // Rim light - warm edge definition
+        rimIntensity: 0.5,
+        rimColor: '#ffb870', // Warm rim
+        rimPosition: [3, 2, -2],
+        // Environment map intensity - very subtle in dark room
+        envMapIntensity: 0.08
     },
     shadow: {
-        opacity: 0.4, // More visible contact shadow
-        blur: 2.5, // Slightly softer
-        scale: 8,
+        opacity: 0.6, // Stronger shadows in dim light
+        blur: 3, // Softer
+        scale: 10,
         far: 5,
-        color: '#3d3428', // Warm shadow color
+        color: '#0a0806', // Very dark warm shadow
         position: [0, -1.2, 0]
     },
     camera: {
@@ -260,12 +260,12 @@ export const cozyTheme: ThemeConfig = {
         normalScale: 0.02 // Tiny surface detail
     },
     ui: {
-        // Warm placard styling
-        panelBackground: 'rgba(45, 40, 35, 0.85)', // Warm dark brown
-        panelBorderColor: 'rgba(255, 248, 240, 0.1)', // Warm border
-        panelShadow: '0 4px 20px rgba(30, 25, 20, 0.4)',
-        panelTextPrimary: 'rgba(255, 252, 247, 0.95)', // Warm white
-        panelTextSecondary: 'rgba(255, 248, 240, 0.6)',
+        // Dark den placard styling
+        panelBackground: 'rgba(25, 22, 18, 0.9)', // Very dark warm brown
+        panelBorderColor: 'rgba(255, 200, 150, 0.12)', // Warm amber border
+        panelShadow: '0 4px 24px rgba(0, 0, 0, 0.6)',
+        panelTextPrimary: 'rgba(255, 245, 230, 0.95)', // Warm white
+        panelTextSecondary: 'rgba(255, 220, 180, 0.6)', // Warm muted
         transitionDuration: 300, // Slightly slower, more elegant
         transitionEasing: 'cubic-bezier(0.4, 0, 0.2, 1)'
     }
