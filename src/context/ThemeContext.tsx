@@ -22,7 +22,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Load saved theme preference on mount
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null
-        if (saved && (saved === 'gallery' || saved === 'cozy')) {
+        if (saved && (saved === 'gallery' || saved === 'study' || saved === 'night')) {
             setThemeModeState(saved)
         }
         setMounted(true)
@@ -33,8 +33,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY, mode)
     }, [])
 
+    // Cycle through themes: gallery -> study -> night -> gallery
     const toggleTheme = useCallback(() => {
-        setThemeMode(themeMode === 'gallery' ? 'cozy' : 'gallery')
+        const nextTheme: ThemeMode = themeMode === 'gallery' ? 'study' : themeMode === 'study' ? 'night' : 'gallery'
+        setThemeMode(nextTheme)
     }, [themeMode, setThemeMode])
 
     const theme = getTheme(themeMode)
@@ -47,12 +49,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const bg = theme.background
         const ui = theme.ui
 
+        // ============================================
         // Background properties
+        // ============================================
         root.style.setProperty('--bg-gradient-center', bg.gradientCenter)
         root.style.setProperty('--bg-gradient-mid', bg.gradientMid)
         root.style.setProperty('--bg-gradient-edge', bg.gradientEdge)
         root.style.setProperty('--bg-vignette-opacity', String(bg.vignetteOpacity))
         root.style.setProperty('--bg-vignette-start', `${bg.vignetteStart}%`)
+        root.style.setProperty('--bg-vignette-edge-only', bg.vignetteEdgeOnly ? '1' : '0')
         root.style.setProperty('--bg-texture-opacity', String(bg.textureOpacity))
         root.style.setProperty('--bg-grain-opacity', String(bg.filmGrainOpacity))
         root.style.setProperty(
@@ -60,12 +65,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             bg.filmGrainAnimated ? 'grain-shift 0.5s steps(4) infinite' : 'none'
         )
 
-        // UI properties
+        // ============================================
+        // UI Panel properties
+        // ============================================
         root.style.setProperty('--panel-bg', ui.panelBackground)
         root.style.setProperty('--panel-border', ui.panelBorderColor)
         root.style.setProperty('--panel-shadow', ui.panelShadow)
+        root.style.setProperty('--panel-border-radius', `${ui.panelBorderRadius}px`)
         root.style.setProperty('--panel-text-primary', ui.panelTextPrimary)
         root.style.setProperty('--panel-text-secondary', ui.panelTextSecondary)
+        root.style.setProperty('--panel-warmth', String(ui.panelWarmth))
+
+        // ============================================
+        // Controls properties
+        // ============================================
+        root.style.setProperty('--controls-opacity', String(ui.controlsOpacity))
+        root.style.setProperty('--controls-hover-opacity', String(ui.controlsHoverOpacity))
+        root.style.setProperty('--controls-show-on-interaction', ui.controlsShowOnInteractionOnly ? '1' : '0')
+
+        // ============================================
+        // Transition properties
+        // ============================================
         root.style.setProperty('--transition-duration', `${ui.transitionDuration}ms`)
         root.style.setProperty('--transition-easing', ui.transitionEasing)
 

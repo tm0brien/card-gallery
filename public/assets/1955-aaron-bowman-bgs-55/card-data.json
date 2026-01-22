@@ -5,10 +5,11 @@
   "set": "Bowman",
   "cardNumber": "179",
   "team": "Milwaukee Braves",
+  "manufacturer": "Bowman Gum Company",
   "grade": {
-    "company": "BGS",
+    "company": "Beckett Grading Services",
     "score": "5.5",
-    "label": "EX+",
+    "label": "Excellent",
     "subgrades": {
       "centering": "6",
       "corners": "5",
@@ -17,5 +18,5 @@
     }
   },
   "certificationNumber": "0012345678",
-  "notes": "Light corner wear, excellent surface preservation. Second-year card of the legendary Hank Aaron."
+  "notes": "Light corner wear. Strong surface preservation."
 }

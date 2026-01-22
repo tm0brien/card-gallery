@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import styles from '../styles/InfoPanel.module.css'
 import { CardData } from '../types/card'
 
 const MOBILE_BREAKPOINT = 640
+const HOVER_INTENT_DELAY = 500 // 400-600ms intent pause
 
 interface InfoPanelProps {
     cardData: CardData
@@ -11,8 +12,8 @@ interface InfoPanelProps {
 
 export default function InfoPanel({ cardData }: InfoPanelProps) {
     const [isExpanded, setIsExpanded] = useState(false)
-    const [isPinned, setIsPinned] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
+    const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
 
     // Check if we're on mobile
     useEffect(() => {
@@ -25,153 +26,102 @@ export default function InfoPanel({ cardData }: InfoPanelProps) {
         return () => window.removeEventListener('resize', checkMobile)
     }, [])
 
-    const handleMouseEnter = useCallback(() => {
-        // Only expand on hover for desktop
-        if (!isMobile && !isPinned) {
-            setIsExpanded(true)
+    // Clear timer on unmount
+    useEffect(() => {
+        return () => {
+            if (hoverTimerRef.current) {
+                clearTimeout(hoverTimerRef.current)
+            }
         }
-    }, [isMobile, isPinned])
+    }, [])
+
+    const handleMouseEnter = useCallback(() => {
+        if (isMobile) return
+        
+        // Start hover intent timer
+        hoverTimerRef.current = setTimeout(() => {
+            setIsExpanded(true)
+        }, HOVER_INTENT_DELAY)
+    }, [isMobile])
 
     const handleMouseLeave = useCallback(() => {
-        // Only collapse on mouse leave for desktop
-        if (!isMobile && !isPinned) {
-            setIsExpanded(false)
-        }
-    }, [isMobile, isPinned])
-
-    const togglePin = (e: React.MouseEvent) => {
-        e.stopPropagation()
-        setIsPinned(!isPinned)
-        if (!isPinned) {
-            setIsExpanded(true)
-        }
-    }
-
-    const toggleExpand = () => {
-        // On mobile, simple toggle
-        if (isMobile) {
-            setIsExpanded(!isExpanded)
-            return
+        if (isMobile) return
+        
+        // Clear hover intent timer
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current)
+            hoverTimerRef.current = null
         }
         
-        // On desktop, pin behavior
-        if (isPinned) {
-            setIsExpanded(!isExpanded)
-        } else {
-            setIsPinned(true)
-            setIsExpanded(true)
+        setIsExpanded(false)
+    }, [isMobile])
+
+    const handleClick = useCallback(() => {
+        // Clear any pending hover timer
+        if (hoverTimerRef.current) {
+            clearTimeout(hoverTimerRef.current)
+            hoverTimerRef.current = null
         }
-    }
+        
+        setIsExpanded(prev => !prev)
+    }, [])
 
     return (
         <div
             className={`${styles.panel} ${isExpanded ? styles.expanded : ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onClick={handleClick}
         >
-            {/* Header - always visible */}
-            <div className={styles.header} onClick={toggleExpand}>
-                <div className={styles.titleRow}>
-                    <h1 className={styles.title}>
-                        {cardData.title} — {cardData.player}
-                    </h1>
-                    <button
-                        className={`${styles.pinButton} ${isPinned ? styles.pinned : ''}`}
-                        onClick={togglePin}
-                        title={isPinned ? 'Unpin panel' : 'Pin panel open'}
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <path
-                                d="M16.5 8.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v8.25A2.25 2.25 0 006 16.5h2.25m8.25-8.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-7.5A2.25 2.25 0 018.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 00-2.25 2.25v6"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </button>
-                </div>
-                <div className={styles.metaRow}>
-                    <span className={styles.gradeBadge}>
-                        {cardData.grade.company} {cardData.grade.score}
-                    </span>
-                    <span className={styles.cardNumber}>Card #{cardData.cardNumber}</span>
-                </div>
+            {/* Collapsed state: Title only */}
+            <div className={styles.header}>
+                <h1 className={styles.title}>
+                    {cardData.title} — {cardData.player}
+                </h1>
             </div>
 
-            {/* Expandable content */}
+            {/* Expanded content */}
             <div className={styles.content}>
-                <div className={styles.grid}>
-                    <div className={styles.gridItem}>
-                        <span className={styles.label}>Year</span>
-                        <span className={styles.value}>{cardData.year}</span>
-                    </div>
-                    <div className={styles.gridItem}>
-                        <span className={styles.label}>Set</span>
-                        <span className={styles.value}>{cardData.set}</span>
-                    </div>
-                    <div className={styles.gridItem}>
-                        <span className={styles.label}>Player</span>
-                        <span className={styles.value}>{cardData.player}</span>
-                    </div>
-                    <div className={styles.gridItem}>
-                        <span className={styles.label}>Team</span>
-                        <span className={styles.value}>{cardData.team}</span>
-                    </div>
+                {/* Provenance */}
+                <div className={styles.provenance}>
+                    <span className={styles.metaLine}>{cardData.team}</span>
+                    {cardData.manufacturer && (
+                        <span className={styles.metaLine}>{cardData.manufacturer}</span>
+                    )}
+                    <span className={styles.metaLine}>Card no. {cardData.cardNumber}</span>
                 </div>
 
-                {/* Grade details */}
-                <div className={styles.section}>
-                    <h3 className={styles.sectionTitle}>Grade Details</h3>
-                    <div className={styles.gradeDetails}>
-                        <div className={styles.gradeMain}>
-                            <span className={styles.gradeScore}>{cardData.grade.score}</span>
-                            {cardData.grade.label && (
-                                <span className={styles.gradeLabel}>{cardData.grade.label}</span>
-                            )}
-                        </div>
-                        {cardData.grade.subgrades && (
-                            <div className={styles.subgrades}>
-                                <div className={styles.subgradeItem}>
-                                    <span className={styles.subgradeLabel}>Centering</span>
-                                    <span className={styles.subgradeValue}>
-                                        {cardData.grade.subgrades.centering}
-                                    </span>
-                                </div>
-                                <div className={styles.subgradeItem}>
-                                    <span className={styles.subgradeLabel}>Corners</span>
-                                    <span className={styles.subgradeValue}>
-                                        {cardData.grade.subgrades.corners}
-                                    </span>
-                                </div>
-                                <div className={styles.subgradeItem}>
-                                    <span className={styles.subgradeLabel}>Edges</span>
-                                    <span className={styles.subgradeValue}>
-                                        {cardData.grade.subgrades.edges}
-                                    </span>
-                                </div>
-                                <div className={styles.subgradeItem}>
-                                    <span className={styles.subgradeLabel}>Surface</span>
-                                    <span className={styles.subgradeValue}>
-                                        {cardData.grade.subgrades.surface}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                {/* Condition / Grade */}
+                <div className={styles.condition}>
+                    <span className={styles.metaLine}>{cardData.grade.company}</span>
+                    <span className={styles.conditionLabel}>
+                        Condition: {cardData.grade.label} ({cardData.grade.score})
+                    </span>
                 </div>
 
-                {/* Certification */}
-                <div className={styles.section}>
-                    <div className={styles.certRow}>
-                        <span className={styles.label}>Certification #</span>
-                        <span className={styles.certNumber}>{cardData.certificationNumber}</span>
+                {/* Subgrades (if present) */}
+                {cardData.grade.subgrades && (
+                    <div className={styles.subgrades}>
+                        <span className={styles.subgradeItem}>
+                            Centering {cardData.grade.subgrades.centering}
+                        </span>
+                        <span className={styles.subgradeItem}>
+                            Corners {cardData.grade.subgrades.corners}
+                        </span>
+                        <span className={styles.subgradeItem}>
+                            Edges {cardData.grade.subgrades.edges}
+                        </span>
+                        <span className={styles.subgradeItem}>
+                            Surface {cardData.grade.subgrades.surface}
+                        </span>
                     </div>
-                </div>
+                )}
 
                 {/* Notes */}
                 {cardData.notes && (
-                    <div className={styles.section}>
-                        <h3 className={styles.sectionTitle}>Notes</h3>
-                        <p className={styles.notes}>{cardData.notes}</p>
+                    <div className={styles.notes}>
+                        <span className={styles.notesLabel}>Notes</span>
+                        <p className={styles.notesText}>{cardData.notes}</p>
                     </div>
                 )}
             </div>

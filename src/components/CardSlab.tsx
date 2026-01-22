@@ -52,10 +52,13 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
     const height = roughDimensions[1] / scale
     const depth = roughDimensions[2] / scale
 
-    // Idle auto-rotation - museum turntable effect
+    // Idle auto-rotation - slow museum turntable effect (1-2° drift)
+    // idleRotationSpeed is in degrees per second
     useFrame((_, delta) => {
         if (isIdle && cameraConfig.idleEnabled && groupRef.current) {
-            groupRef.current.rotation.y += cameraConfig.idleRotationSpeed * delta * 60
+            // Convert degrees/sec to radians, multiply by delta for frame-independent speed
+            const radiansPerSecond = (cameraConfig.idleRotationSpeed * Math.PI) / 180
+            groupRef.current.rotation.y += radiansPerSecond * delta
         }
     })
 
@@ -63,6 +66,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
         <group ref={groupRef}>
             <mesh>
                 <boxGeometry args={[width, height, depth]} />
+                {/* Right face */}
                 <meshStandardMaterial
                     attach="material-0"
                     map={textures.right}
@@ -70,6 +74,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
                     metalness={materialConfig.metalness}
                     envMapIntensity={materialConfig.envMapIntensity}
                 />
+                {/* Left face */}
                 <meshStandardMaterial
                     attach="material-1"
                     map={textures.left}
@@ -77,6 +82,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
                     metalness={materialConfig.metalness}
                     envMapIntensity={materialConfig.envMapIntensity}
                 />
+                {/* Top face */}
                 <meshStandardMaterial
                     attach="material-2"
                     map={textures.top}
@@ -84,6 +90,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
                     metalness={materialConfig.metalness}
                     envMapIntensity={materialConfig.envMapIntensity}
                 />
+                {/* Bottom face */}
                 <meshStandardMaterial
                     attach="material-3"
                     map={textures.bottom}
@@ -91,6 +98,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
                     metalness={materialConfig.metalness}
                     envMapIntensity={materialConfig.envMapIntensity}
                 />
+                {/* Front face */}
                 <meshStandardMaterial
                     attach="material-4"
                     map={textures.front}
@@ -98,6 +106,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
                     metalness={materialConfig.metalness}
                     envMapIntensity={materialConfig.envMapIntensity}
                 />
+                {/* Back face */}
                 <meshStandardMaterial
                     attach="material-5"
                     map={textures.back}

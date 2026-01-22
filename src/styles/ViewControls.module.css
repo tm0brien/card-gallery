@@ -1,137 +1,151 @@
 /* ============================================
-   View Controls
+   View Controls - Camera Mode Selector
+   Museum-grade minimal design
+   De-emphasized to not draw attention from the card
    ============================================ */
 
 .container {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  z-index: 50;
-  opacity: 0.5;
-  transition: opacity var(--transition-duration) var(--transition-easing),
-              transform var(--transition-duration) var(--transition-easing);
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    z-index: 50;
+    opacity: var(--controls-opacity);
+    transition: 
+        opacity var(--transition-duration) var(--transition-easing),
+        transform var(--transition-duration) var(--transition-easing);
+}
+
+/* Show on interaction only (theme-controlled) */
+.container.hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+    pointer-events: none;
 }
 
 .container:hover,
-.container.hovered {
-  opacity: 1;
+.container.visible {
+    opacity: var(--controls-hover-opacity);
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
 }
 
-.button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--panel-text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-duration) var(--transition-easing);
+/* ============================================
+   Mode Buttons
+   ============================================ */
+
+.modeButton {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--panel-text-secondary);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: 
+        color var(--transition-duration) var(--transition-easing),
+        background var(--transition-duration) var(--transition-easing);
 }
 
-.button:hover:not(:disabled) {
-  background: rgba(255, 248, 240, 0.06);
-  border-color: rgba(255, 248, 240, 0.1);
-  color: var(--panel-text-primary);
+.modeButton:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 12px;
+    background: var(--panel-border);
 }
 
-.button:active:not(:disabled) {
-  transform: scale(0.95);
+.modeButton:hover {
+    color: var(--panel-text-primary);
 }
 
-.button:disabled {
-  opacity: 0.4;
-  cursor: default;
+.modeButton.active {
+    color: var(--panel-text-primary);
+    background: rgba(128, 128, 128, 0.05);
 }
 
-/* Auto mode active state - subtle indicator */
-.button.autoMode {
-  opacity: 0.6;
-  color: var(--panel-text-secondary);
+/* ============================================
+   Glyph Icons
+   ============================================ */
+
+.glyph {
+    width: 12px;
+    height: 12px;
+    opacity: 0.6;
+    transition: opacity var(--transition-duration) var(--transition-easing);
 }
 
-/* AUTO label indicator */
-.autoLabel {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--panel-text-secondary);
-  opacity: 0;
-  transition: opacity var(--transition-duration) var(--transition-easing);
+.modeButton:hover .glyph,
+.modeButton.active .glyph {
+    opacity: 0.9;
 }
 
-.autoLabel.visible {
-  opacity: 1;
+/* ============================================
+   Compact Mode (single icon affordance)
+   Shows on hover to reveal full controls
+   ============================================ */
+
+.compactIndicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--panel-text-secondary);
+    opacity: 0.5;
+    transition: opacity var(--transition-duration) var(--transition-easing);
 }
 
-.button svg {
-  width: 20px;
-  height: 20px;
+.container:hover .compactIndicator {
+    opacity: 0;
 }
 
-/* Tooltip on hover */
-.button::after {
-  content: attr(title);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 6px 10px;
-  background: rgba(30, 25, 20, 0.9);
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--panel-text-primary);
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-duration) var(--transition-easing),
-              transform var(--transition-duration) var(--transition-easing);
-  margin-bottom: 8px;
-}
+/* ============================================
+   Mobile Adjustments
+   ============================================ */
 
-.button:hover::after {
-  opacity: 1;
-}
-
-/* Mobile adjustments */
 @media (max-width: 640px) {
-  .container {
-    bottom: auto;
-    top: 16px;
-    padding: 6px 10px;
-    gap: 6px;
-  }
+    .container {
+        /* Move to top center on mobile to avoid bottom sheet */
+        bottom: auto;
+        top: 16px;
+    }
 
-  .button {
-    width: 40px;
-    height: 40px;
-  }
+    .container.hidden {
+        transform: translateX(-50%) translateY(-8px);
+    }
 
-  .button svg {
-    width: 22px;
-    height: 22px;
-  }
+    .container:hover,
+    .container.visible {
+        transform: translateX(-50%) translateY(0);
+    }
 
-  .button::after {
-    display: none;
-  }
+    .modeButton {
+        padding: 9px 11px;
+        font-size: 10px;
+        gap: 4px;
+    }
 
-  .autoLabel {
-    font-size: 9px;
-  }
+    .glyph {
+        width: 11px;
+        height: 11px;
+    }
 }

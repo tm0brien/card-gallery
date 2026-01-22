@@ -19,10 +19,10 @@ export interface CardData {
     set: string
     cardNumber: string
     team: string
+    manufacturer?: string
     grade: CardGrade
     certificationNumber: string
     notes?: string
-    provenance?: string
 }
 
 export interface CameraPreset {
