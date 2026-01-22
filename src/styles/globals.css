@@ -188,76 +188,6 @@ a {
   opacity: 0.8;
 }
 
-/* ============================================
-   Help Hint (Bottom inline hint)
-   ============================================ */
-.help-hint {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 18px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  color: var(--panel-text-secondary);
-  font-size: 13px;
-  z-index: 40;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.4s var(--transition-easing);
-}
-
-.help-hint.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.help-hint span {
-  white-space: nowrap;
-}
-
-.help-hint .separator {
-  width: 1px;
-  height: 14px;
-  background: var(--panel-border);
-}
-
-/* Help button (? icon) */
-.help-button {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  background: var(--panel-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--panel-border);
-  border-radius: 50%;
-  color: var(--panel-text-secondary);
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  z-index: 50;
-  opacity: 0.5;
-  transition: opacity var(--transition-duration) var(--transition-easing);
-}
-
-.help-button:hover {
-  opacity: 1;
-  color: var(--panel-text-primary);
-}
-
 /* Mobile adjustments */
 @media (max-width: 640px) {
   .theme-toggle {
@@ -265,17 +195,5 @@ a {
     right: 16px;
     padding: 8px 12px;
     font-size: 12px;
-  }
-
-  .help-hint {
-    bottom: 100px;
-    gap: 12px;
-    padding: 8px 14px;
-    font-size: 12px;
-  }
-
-  .help-button {
-    bottom: 16px;
-    right: 16px;
   }
 }

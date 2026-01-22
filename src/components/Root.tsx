@@ -3,67 +3,68 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { useTheme } from '../context/ThemeContext'
+import { useAutoFitCamera } from '../hooks/useAutoFitCamera'
 import { useIdleDetection } from '../hooks/useIdleDetection'
-import { CameraPreset, CardData } from '../types/card'
-import CameraController from './CameraController'
+import { CardData } from '../types/card'
 import CardSlab, { CardSlabRef } from './CardSlab'
 import CinematicScene from './CinematicScene'
 import InfoPanel from './InfoPanel'
-import ResponsiveCamera from './ResponsiveCamera'
 import ViewControls from './ViewControls'
 
 const ASSET_PATH = '/assets/1955-aaron-bowman-bgs-55'
-const MOBILE_BREAKPOINT = 640
 
-// Calculate responsive camera Z position
-function getResponsiveCameraZ(): number {
-    if (typeof window === 'undefined') return 5
-
-    const width = window.innerWidth
-    const height = window.innerHeight
-    const aspectRatio = width / height
-    const isMobile = width <= MOBILE_BREAKPOINT
-
-    if (isMobile || aspectRatio < 1) {
-        if (aspectRatio < 0.6) return 8
-        if (aspectRatio < 0.8) return 7
-        if (aspectRatio < 1) return 6
-    }
-    return 5
+export interface SceneControlsRef {
+    resetToAutoMode: () => void
 }
 
 interface SceneContentProps {
     isIdle: boolean
     onInteraction: () => void
-    targetPreset: CameraPreset | null
-    presetTriggerId: number
-    onAnimationStart: () => void
-    onAnimationEnd: () => void
+    onAutoModeChange: (isAuto: boolean) => void
+    controlsRef: React.MutableRefObject<SceneControlsRef | null>
     theme: import('../config/theme').ThemeConfig
 }
 
-function SceneContent({
-    isIdle,
-    onInteraction,
-    targetPreset,
-    presetTriggerId,
-    onAnimationStart,
-    onAnimationEnd,
-    theme
-}: SceneContentProps) {
+function SceneContent({ isIdle, onInteraction, onAutoModeChange, controlsRef, theme }: SceneContentProps) {
     const cardRef = useRef<CardSlabRef>(null)
     const cameraConfig = theme.camera
+    const initialReportRef = useRef(false)
+
+    const { isAutoMode, disableAutoMode, resetToAutoMode } = useAutoFitCamera({
+        onAutoModeDisabled: () => onAutoModeChange(false),
+        onAutoModeEnabled: () => onAutoModeChange(true)
+    })
+
+    // Expose controls to parent via ref
+    useEffect(() => {
+        controlsRef.current = {
+            resetToAutoMode
+        }
+    }, [controlsRef, resetToAutoMode])
+
+    // Report initial auto mode state (only once)
+    useEffect(() => {
+        if (!initialReportRef.current) {
+            initialReportRef.current = true
+            onAutoModeChange(isAutoMode)
+        }
+    }, [isAutoMode, onAutoModeChange])
+
+    // Handle orbit controls interaction
+    const handleControlsChange = useCallback(() => {
+        disableAutoMode()
+        onInteraction()
+    }, [disableAutoMode, onInteraction])
 
     return (
         <>
             <CinematicScene theme={theme} />
-            <ResponsiveCamera />
             <CardSlab ref={cardRef} assetPath={ASSET_PATH} isIdle={isIdle} theme={theme} />
             <OrbitControls
                 enablePan={true}
                 minDistance={0.5}
                 maxDistance={16}
-                onChange={onInteraction}
+                onChange={handleControlsChange}
                 enableDamping={cameraConfig.enableDamping}
                 dampingFactor={cameraConfig.dampingFactor}
                 rotateSpeed={cameraConfig.rotateSpeed}
@@ -71,12 +72,6 @@ function SceneContent({
                 panSpeed={cameraConfig.panSpeed}
                 minPolarAngle={cameraConfig.minPolarAngle}
                 maxPolarAngle={cameraConfig.maxPolarAngle}
-            />
-            <CameraController
-                targetPreset={targetPreset}
-                triggerId={presetTriggerId}
-                onAnimationStart={onAnimationStart}
-                onAnimationEnd={onAnimationEnd}
             />
         </>
     )
@@ -86,11 +81,9 @@ const Root: React.FC = () => {
     const [isInteracting, setIsInteracting] = useState(false)
     const [cardData, setCardData] = useState<CardData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
-    const [targetPreset, setTargetPreset] = useState<CameraPreset | null>(null)
-    const [presetTriggerId, setPresetTriggerId] = useState(0)
-    const [isCameraAnimating, setIsCameraAnimating] = useState(false)
-    const [showHelpHint, setShowHelpHint] = useState(false)
-    const [hasInteracted, setHasInteracted] = useState(false)
+    const [isAutoMode, setIsAutoMode] = useState(true)
+
+    const sceneControlsRef = useRef<SceneControlsRef | null>(null)
 
     const { theme, themeMode, toggleTheme } = useTheme()
 
@@ -116,37 +109,15 @@ const Root: React.FC = () => {
 
     const handleInteraction = useCallback(() => {
         markInteraction()
-        // Hide help hint after first interaction
-        if (!hasInteracted) {
-            setHasInteracted(true)
-            setShowHelpHint(false)
-        }
-    }, [markInteraction, hasInteracted])
+    }, [markInteraction])
 
-    const handlePresetSelect = useCallback(
-        (preset: CameraPreset) => {
-            // Use responsive camera Z for reset preset
-            const responsivePreset: CameraPreset = {
-                ...preset,
-                position: [preset.position[0], preset.position[1], getResponsiveCameraZ()]
-            }
-            setTargetPreset(responsivePreset)
-            setPresetTriggerId(id => id + 1)
-            markInteraction()
-        },
-        [markInteraction]
-    )
+    const handleResetToAuto = useCallback(() => {
+        sceneControlsRef.current?.resetToAutoMode()
+        markInteraction()
+    }, [markInteraction])
 
-    const handleAnimationStart = useCallback(() => {
-        setIsCameraAnimating(true)
-    }, [])
-
-    const handleAnimationEnd = useCallback(() => {
-        setIsCameraAnimating(false)
-    }, [])
-
-    const handleHelpClick = useCallback(() => {
-        setShowHelpHint(prev => !prev)
+    const handleAutoModeChange = useCallback((isAuto: boolean) => {
+        setIsAutoMode(isAuto)
     }, [])
 
     return (
@@ -171,10 +142,8 @@ const Root: React.FC = () => {
                     <SceneContent
                         isIdle={isIdle}
                         onInteraction={handleInteraction}
-                        targetPreset={targetPreset}
-                        presetTriggerId={presetTriggerId}
-                        onAnimationStart={handleAnimationStart}
-                        onAnimationEnd={handleAnimationEnd}
+                        onAutoModeChange={handleAutoModeChange}
+                        controlsRef={sceneControlsRef}
                         theme={theme}
                     />
                 </Suspense>
@@ -202,21 +171,9 @@ const Root: React.FC = () => {
                 <span>{themeMode === 'cozy' ? 'Gallery' : 'Cozy'}</span>
             </button>
 
-            {/* Help Hint */}
-            <div className={`help-hint ${showHelpHint ? 'visible' : ''}`}>
-                <span>Drag to rotate</span>
-                <div className="separator" />
-                <span>Scroll to zoom</span>
-            </div>
-
-            {/* Help Button */}
-            <button className="help-button" onClick={handleHelpClick} title="Controls help">
-                ?
-            </button>
-
             {/* UI Overlays */}
             {cardData && <InfoPanel cardData={cardData} />}
-            <ViewControls onPresetSelect={handlePresetSelect} isAnimating={isCameraAnimating} />
+            <ViewControls onResetToAuto={handleResetToAuto} isAutoMode={isAutoMode} />
         </div>
     )
 }

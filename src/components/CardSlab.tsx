@@ -63,12 +63,48 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({ asse
         <group ref={groupRef}>
             <mesh>
                 <boxGeometry args={[width, height, depth]} />
-                <meshStandardMaterial attach="material-0" map={textures.right} />
-                <meshStandardMaterial attach="material-1" map={textures.left} />
-                <meshStandardMaterial attach="material-2" map={textures.top} />
-                <meshStandardMaterial attach="material-3" map={textures.bottom} />
-                <meshStandardMaterial attach="material-4" map={textures.front} />
-                <meshStandardMaterial attach="material-5" map={textures.back} />
+                <meshStandardMaterial
+                    attach="material-0"
+                    map={textures.right}
+                    roughness={materialConfig.roughness}
+                    metalness={materialConfig.metalness}
+                    envMapIntensity={materialConfig.envMapIntensity}
+                />
+                <meshStandardMaterial
+                    attach="material-1"
+                    map={textures.left}
+                    roughness={materialConfig.roughness}
+                    metalness={materialConfig.metalness}
+                    envMapIntensity={materialConfig.envMapIntensity}
+                />
+                <meshStandardMaterial
+                    attach="material-2"
+                    map={textures.top}
+                    roughness={materialConfig.roughness}
+                    metalness={materialConfig.metalness}
+                    envMapIntensity={materialConfig.envMapIntensity}
+                />
+                <meshStandardMaterial
+                    attach="material-3"
+                    map={textures.bottom}
+                    roughness={materialConfig.roughness}
+                    metalness={materialConfig.metalness}
+                    envMapIntensity={materialConfig.envMapIntensity}
+                />
+                <meshStandardMaterial
+                    attach="material-4"
+                    map={textures.front}
+                    roughness={materialConfig.roughness}
+                    metalness={materialConfig.metalness}
+                    envMapIntensity={materialConfig.envMapIntensity}
+                />
+                <meshStandardMaterial
+                    attach="material-5"
+                    map={textures.back}
+                    roughness={materialConfig.roughness}
+                    metalness={materialConfig.metalness}
+                    envMapIntensity={materialConfig.envMapIntensity}
+                />
             </mesh>
         </group>
     )

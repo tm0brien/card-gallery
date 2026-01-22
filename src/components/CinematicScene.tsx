@@ -1,4 +1,4 @@
-import { ContactShadows } from '@react-three/drei'
+import { ContactShadows, Environment } from '@react-three/drei'
 
 import { ThemeConfig } from '../config/theme'
 
@@ -52,8 +52,8 @@ export default function CinematicScene({ showShadows = true, theme }: CinematicS
             {/* ============================================
                 Environment - Soft reflections
                 Clamped intensity for plastic look
-                Note: Using a simple approach for now
                 ============================================ */}
+            <Environment preset="studio" environmentIntensity={lighting.envMapIntensity} />
 
             {/* ============================================
                 Contact Shadows - Grounds the object

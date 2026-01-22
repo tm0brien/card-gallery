@@ -73,7 +73,8 @@ export default function CameraController({
                     startTarget = orbitControls?.target?.clone() || new THREE.Vector3(0, 0, 0)
                     
                     // Convert positions to spherical coordinates relative to their targets
-                    const startOffset = startPosition.clone().sub(startTarget)
+                    // startPosition and startTarget are guaranteed to be set at this point
+                    const startOffset = startPosition.clone().sub(startTarget as THREE.Vector3)
                     const endOffset = endPosition.clone().sub(endTarget)
                     
                     startSpherical = new THREE.Spherical().setFromVector3(startOffset)

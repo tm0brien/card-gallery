@@ -8,7 +8,9 @@
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   padding: 8px 12px;
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
@@ -54,7 +56,27 @@
 
 .button:disabled {
   opacity: 0.4;
-  cursor: not-allowed;
+  cursor: default;
+}
+
+/* Auto mode active state - subtle indicator */
+.button.autoMode {
+  opacity: 0.6;
+  color: var(--panel-text-secondary);
+}
+
+/* AUTO label indicator */
+.autoLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--panel-text-secondary);
+  opacity: 0;
+  transition: opacity var(--transition-duration) var(--transition-easing);
+}
+
+.autoLabel.visible {
+  opacity: 1;
 }
 
 .button svg {
@@ -107,5 +129,9 @@
 
   .button::after {
     display: none;
+  }
+
+  .autoLabel {
+    font-size: 9px;
   }
 }
