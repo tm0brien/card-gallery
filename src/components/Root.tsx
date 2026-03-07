@@ -11,8 +11,6 @@ import CinematicScene from './CinematicScene'
 import InfoPanel from './InfoPanel'
 import ViewControls, { CameraMode } from './ViewControls'
 
-const ASSET_PATH = '/assets/1955-aaron-bowman-bgs-55'
-
 export interface SceneControlsRef {
     resetToAutoMode: () => void
 }
@@ -23,9 +21,10 @@ interface SceneContentProps {
     onAutoModeChange: (isAuto: boolean) => void
     controlsRef: React.MutableRefObject<SceneControlsRef | null>
     theme: import('../config/theme').ThemeConfig
+    assetPath: string
 }
 
-function SceneContent({ isIdle, onInteraction, onAutoModeChange, controlsRef, theme }: SceneContentProps) {
+function SceneContent({ isIdle, onInteraction, onAutoModeChange, controlsRef, theme, assetPath }: SceneContentProps) {
     const cardRef = useRef<CardSlabRef>(null)
     const cameraConfig = theme.camera
     const initialReportRef = useRef(false)
@@ -59,7 +58,7 @@ function SceneContent({ isIdle, onInteraction, onAutoModeChange, controlsRef, th
     return (
         <>
             <CinematicScene theme={theme} />
-            <CardSlab ref={cardRef} assetPath={ASSET_PATH} isIdle={isIdle} theme={theme} />
+            <CardSlab ref={cardRef} assetPath={assetPath} isIdle={isIdle} theme={theme} />
             <OrbitControls
                 enablePan={true}
                 minDistance={0.5}
@@ -77,7 +76,11 @@ function SceneContent({ isIdle, onInteraction, onAutoModeChange, controlsRef, th
     )
 }
 
-const Root: React.FC = () => {
+interface RootProps {
+    assetPath: string
+}
+
+const Root: React.FC<RootProps> = ({ assetPath }) => {
     const [isInteracting, setIsInteracting] = useState(false)
     const [cardData, setCardData] = useState<CardData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -95,7 +98,7 @@ const Root: React.FC = () => {
 
     // Load card data
     useEffect(() => {
-        fetch(`${ASSET_PATH}/card-data.json`)
+        fetch(`${assetPath}/card-data.json`)
             .then(res => res.json())
             .then((data: CardData) => {
                 setCardData(data)
@@ -154,6 +157,7 @@ const Root: React.FC = () => {
                         onAutoModeChange={handleAutoModeChange}
                         controlsRef={sceneControlsRef}
                         theme={theme}
+                        assetPath={assetPath}
                     />
                 </Suspense>
             </Canvas>
