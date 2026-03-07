@@ -1,4 +1,4 @@
-import { ContactShadows, Environment } from '@react-three/drei'
+import { ContactShadows } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import * as THREE from 'three'
@@ -90,12 +90,6 @@ export default function CinematicScene({ showShadows = true, theme }: CinematicS
                 intensity={lighting.rimIntensity}
                 color={lighting.rimColor}
             />
-
-            {/* ============================================
-                Environment - Soft reflections
-                Clamped intensity for plastic look (not chrome)
-                ============================================ */}
-            <Environment preset="studio" environmentIntensity={lighting.envMapIntensity} />
 
             {/* ============================================
                 Contact Shadows - Grounding through light, not surfaces
