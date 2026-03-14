@@ -37,6 +37,23 @@ function hasAssets(id: string): boolean {
   )
 }
 
+/** Read width/height from a PNG's IHDR chunk (bytes 16–23). */
+function detectOrientation(id: string): 'portrait' | 'landscape' | undefined {
+  const frontPath = path.join(ASSETS_DIR, id, 'front.png')
+  if (!fs.existsSync(frontPath)) return undefined
+  try {
+    const buf = Buffer.alloc(24)
+    const fd = fs.openSync(frontPath, 'r')
+    fs.readSync(fd, buf, 0, 24, 0)
+    fs.closeSync(fd)
+    const width = buf.readUInt32BE(16)
+    const height = buf.readUInt32BE(20)
+    return width > height ? 'landscape' : 'portrait'
+  } catch {
+    return undefined
+  }
+}
+
 function httpsGet(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const request = (targetUrl: string) => {
@@ -81,6 +98,14 @@ async function main() {
   }
 
   const cards = parseSheetCSV(csvText, hasAssets)
+
+  for (const card of cards) {
+    const orientation = detectOrientation(card.id)
+    if (orientation && orientation !== 'portrait') {
+      card.orientation = orientation
+    }
+  }
+
   console.log(`✅  Parsed ${cards.length} cards.\n`)
 
   let skipped = 0

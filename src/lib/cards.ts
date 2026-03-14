@@ -27,6 +27,22 @@ function hasAssets(id: string): boolean {
   )
 }
 
+function detectOrientation(id: string): 'portrait' | 'landscape' | undefined {
+  const frontPath = path.join(ASSETS_DIR, id, 'front.png')
+  if (!fs.existsSync(frontPath)) return undefined
+  try {
+    const buf = Buffer.alloc(24)
+    const fd = fs.openSync(frontPath, 'r')
+    fs.readSync(fd, buf, 0, 24, 0)
+    fs.closeSync(fd)
+    const width = buf.readUInt32BE(16)
+    const height = buf.readUInt32BE(20)
+    return width > height ? 'landscape' : 'portrait'
+  } catch {
+    return undefined
+  }
+}
+
 function readCache(): CardManifest | null {
   try {
     const raw = fs.readFileSync(MANIFEST_PATH, 'utf8')
@@ -58,6 +74,12 @@ export async function getCards(): Promise<CardManifest> {
       if (res.ok) {
         const csvText = await res.text()
         const cards = parseSheetCSV(csvText, hasAssets)
+        for (const card of cards) {
+          const orientation = detectOrientation(card.id)
+          if (orientation && orientation !== 'portrait') {
+            card.orientation = orientation
+          }
+        }
         const manifest: CardManifest = {
           version: 1,
           lastSynced: new Date().toISOString(),

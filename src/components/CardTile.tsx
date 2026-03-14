@@ -1,8 +1,10 @@
-import Image from 'next/image'
+import { Canvas } from '@react-three/fiber'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
 import styles from '../styles/Gallery.module.css'
 import type { CardSummary } from '../types/card'
+import GalleryCardView from './GalleryCardView'
 
 interface CardTileProps {
     card: CardSummary
@@ -11,19 +13,20 @@ interface CardTileProps {
 export default function CardTile({ card }: CardTileProps) {
     const yearSet = [card.year, card.set, card.subset].filter(Boolean).join(' · ')
     const grade = `${card.grade.company} ${card.grade.score}`
+    const isLandscape = card.orientation === 'landscape'
 
     const tileContent = (
         <div className={`${styles.tile} ${!card.hasAssets ? styles.tilePlaceholder : ''}`}>
-            <div className={styles.imageContainer}>
+            <div className={`${styles.imageContainer} ${isLandscape ? styles.imageContainerLandscape : ''}`}>
                 {card.hasAssets ? (
-                    <Image
-                        src={`/assets/${card.id}/front.png`}
-                        alt={card.title}
-                        fill
-                        sizes="(max-width: 400px) 100vw, (max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
-                        className={styles.cardImage}
-                        quality={80}
-                    />
+                    <Canvas
+                        gl={{ alpha: true, antialias: true }}
+                        style={{ position: 'absolute', inset: 0 }}
+                    >
+                        <Suspense fallback={null}>
+                            <GalleryCardView card={card} />
+                        </Suspense>
+                    </Canvas>
                 ) : (
                     <div className={styles.noImage}>
                         <span className={styles.noImageIcon}>⬜</span>
@@ -43,11 +46,11 @@ export default function CardTile({ card }: CardTileProps) {
     )
 
     if (!card.hasAssets) {
-        return tileContent
+        return <div className={isLandscape ? styles.tileLandscape : ''}>{tileContent}</div>
     }
 
     return (
-        <Link href={`/card/${card.id}`} className={styles.tileLink}>
+        <Link href={`/card/${card.id}`} className={`${styles.tileLink} ${isLandscape ? styles.tileLandscape : ''}`}>
             {tileContent}
         </Link>
     )

@@ -1,0 +1,398 @@
+/* ============================================
+   Remix Page Layout
+   ============================================ */
+
+.page {
+  position: relative;
+  min-height: 100vh;
+  z-index: 5;
+  padding: 0 40px 64px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   Navigation
+   ============================================ */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 0 20px;
+}
+
+.backLink {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--panel-text-secondary);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color var(--transition-duration) var(--transition-easing);
+}
+
+.backLink:hover {
+  color: var(--panel-text-primary);
+}
+
+.stepTabs {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: 0;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+}
+
+.stepTab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--panel-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color var(--transition-duration) var(--transition-easing),
+              background var(--transition-duration) var(--transition-easing);
+}
+
+.stepTab:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stepTab:not(:last-child) {
+  border-right: 1px solid var(--panel-border);
+}
+
+.stepTabActive {
+  color: var(--panel-text-primary);
+  background: rgba(128, 128, 128, 0.08);
+}
+
+/* ============================================
+   Header
+   ============================================ */
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.heading {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--panel-text-primary);
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.grade {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--panel-text-secondary);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   Editor Section (shared by Mask + Remix)
+   ============================================ */
+
+.editorSection {
+  margin-bottom: 40px;
+}
+
+.sectionTitle {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--panel-text-primary);
+  margin: 0 0 8px;
+}
+
+.sectionHint {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--panel-text-secondary);
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.sectionHint strong {
+  color: var(--panel-text-primary);
+  font-weight: 500;
+}
+
+/* ============================================
+   Toolbar
+   ============================================ */
+
+.toolBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.toolSpacer {
+  flex: 1;
+}
+
+.toolBtn {
+  padding: 7px 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  color: var(--panel-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color var(--transition-duration) var(--transition-easing),
+              border-color var(--transition-duration) var(--transition-easing);
+}
+
+.toolBtn:hover:not(:disabled) {
+  color: var(--panel-text-primary);
+  border-color: rgba(255, 200, 120, 0.16);
+}
+
+.toolBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.toolBtnActive {
+  color: var(--panel-text-primary);
+  background: rgba(128, 128, 128, 0.08);
+  border-color: rgba(255, 200, 120, 0.16);
+}
+
+.includeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(100, 200, 255, 0.9);
+}
+
+.excludeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 100, 100, 0.9);
+}
+
+.saveBtn {
+  color: var(--panel-text-primary);
+  background: rgba(100, 200, 255, 0.12);
+  border-color: rgba(100, 200, 255, 0.25);
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: rgba(100, 200, 255, 0.18);
+  border-color: rgba(100, 200, 255, 0.35);
+}
+
+.generateBtn {
+  color: var(--panel-text-primary);
+  background: rgba(100, 200, 255, 0.12);
+  border-color: rgba(100, 200, 255, 0.25);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.generateBtn:hover:not(:disabled) {
+  background: rgba(100, 200, 255, 0.18);
+  border-color: rgba(100, 200, 255, 0.35);
+}
+
+/* ============================================
+   Canvas / Mask Editor
+   ============================================ */
+
+.canvasWrap {
+  position: relative;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  max-width: 560px;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+}
+
+.canvasLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.canvasLoading span {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--panel-text-primary);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   Prompt Input
+   ============================================ */
+
+.promptRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.promptInput {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  color: var(--panel-text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-duration) var(--transition-easing);
+}
+
+.promptInput::placeholder {
+  color: var(--panel-text-secondary);
+  opacity: 0.6;
+}
+
+.promptInput:focus {
+  border-color: rgba(100, 200, 255, 0.3);
+}
+
+/* ============================================
+   Preview Section
+   ============================================ */
+
+.previewSection {
+  margin-top: 8px;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.previewCard {
+  position: relative;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.previewLabel {
+  display: block;
+  padding: 6px 10px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--panel-text-secondary);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.previewImageWrap {
+  position: relative;
+  aspect-ratio: 5 / 7;
+}
+
+.previewLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: rgba(100, 200, 255, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.previewActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.errorText {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: rgba(255, 120, 100, 0.9);
+  margin: 0 0 16px;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 768px) {
+  .page {
+    padding: 0 20px 48px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .heading {
+    font-size: 18px;
+  }
+
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .promptRow {
+    flex-direction: column;
+  }
+
+  .nav {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .stepTabs {
+    margin-left: 0;
+  }
+}

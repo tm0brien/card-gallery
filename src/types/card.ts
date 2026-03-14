@@ -49,6 +49,8 @@ export interface CardSummary {
   autoGrade?: string
   certificationNumber: string
   notes?: string
+  /** "portrait" (default) or "landscape" — auto-detected from front.png dimensions */
+  orientation?: 'portrait' | 'landscape'
   /** True when front.png and back.png exist under public/assets/[id]/ */
   hasAssets: boolean
   /** ISO timestamp of the last sync from Google Sheets */
