@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 
+import { createRoundedBoxGeometry } from '../lib/roundedBoxGeometry'
 import type { CardSummary } from '../types/card'
 
 const DEPTH = 0.06
@@ -20,6 +21,11 @@ export default function GalleryCardView({ card }: Props) {
     const meshRef = useRef<THREE.Mesh>(null)
     const [hovered, setHovered] = useState(false)
     const pointer = useRef({ x: 0, y: 0 })
+
+    const geometry = useMemo(
+        () => createRoundedBoxGeometry(w, h, DEPTH, 0.015),
+        [w, h]
+    )
 
     const texture = useTexture(`/assets/${card.id}/front.png`)
     useMemo(() => {
@@ -71,6 +77,7 @@ export default function GalleryCardView({ card }: Props) {
 
             <mesh
                 ref={meshRef}
+                geometry={geometry}
                 onPointerOver={(e) => {
                     e.stopPropagation()
                     setHovered(true)
@@ -81,7 +88,6 @@ export default function GalleryCardView({ card }: Props) {
                     pointer.current.y = THREE.MathUtils.clamp(e.point.y / (h / 2), -1, 1)
                 }}
             >
-                <boxGeometry args={[w, h, DEPTH]} />
                 <meshStandardMaterial attach="material-0" color={EDGE_COLOR} />
                 <meshStandardMaterial attach="material-1" color={EDGE_COLOR} />
                 <meshStandardMaterial attach="material-2" color={EDGE_COLOR} />
