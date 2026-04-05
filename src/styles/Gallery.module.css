@@ -277,11 +277,14 @@
   font-size: 11px;
   color: var(--panel-text-secondary);
   text-decoration: none;
+  appearance: none;
   opacity: var(--controls-opacity);
   transition: opacity var(--transition-duration) var(--transition-easing),
               color var(--transition-duration) var(--transition-easing);
   z-index: 50;
   letter-spacing: 0.02em;
+  cursor: pointer;
+  outline: none;
 }
 
 .backButton:hover {

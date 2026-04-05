@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import fs from 'fs'
 import path from 'path'
+import { ensureRemixesDir, appendToManifest } from '../../../lib/remixes'
 
 const ASSETS_DIR = path.resolve(process.cwd(), 'public/assets')
 
@@ -12,7 +13,11 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { cardId, imageUrl } = req.body as { cardId: string; imageUrl: string }
+  const { cardId, imageUrl, prompt = '' } = req.body as {
+    cardId: string
+    imageUrl: string
+    prompt?: string
+  }
 
   if (!cardId || !imageUrl) {
     return res.status(400).json({ error: 'cardId and imageUrl are required' })
@@ -28,10 +33,24 @@ export default async function handler(
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`)
 
     const buffer = Buffer.from(await response.arrayBuffer())
-    const remixPath = path.join(cardDir, 'remix-front.png')
-    fs.writeFileSync(remixPath, buffer)
+    const id = String(Date.now())
+    const filename = `${id}-image.png`
+    const remixesDir = ensureRemixesDir(cardId)
+    fs.writeFileSync(path.join(remixesDir, filename), buffer)
 
-    return res.status(200).json({ saved: true, path: `/assets/${cardId}/remix-front.png` })
+    appendToManifest(cardId, {
+      id,
+      type: 'image',
+      filename,
+      prompt,
+      createdAt: new Date().toISOString(),
+    })
+
+    return res.status(200).json({
+      saved: true,
+      path: `/assets/${cardId}/remixes/${filename}`,
+      id,
+    })
   } catch (err) {
     console.error('[remix/save] Error:', err)
     return res.status(500).json({ error: 'Failed to save remix' })

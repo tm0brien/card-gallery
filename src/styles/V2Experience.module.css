@@ -1,0 +1,56 @@
+.shell {
+  background: linear-gradient(180deg, #fbfaf7 0%, #f7f5f0 58%, #f3f0ea 100%);
+}
+
+.collectionVeil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 78% 72% at center,
+    rgba(20, 18, 14, 0.02) 0%,
+    rgba(20, 18, 14, 0.08) 72%,
+    rgba(20, 18, 14, 0.14) 100%
+  );
+  transition: opacity 220ms ease;
+}
+
+.stageLabel {
+  position: fixed;
+  top: 28px;
+  right: 28px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--panel-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stageHint {
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+@media (max-width: 640px) {
+  .stageLabel {
+    top: 16px;
+    right: 16px;
+    max-width: calc(100vw - 32px);
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+
+  .stageHint {
+    display: none;
+  }
+}

@@ -2,22 +2,15 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 
-// Card dimensions from CardSlab.tsx
-const CARD_WIDTH = 6100 / 1600 // 3.8125
-const CARD_HEIGHT = 3800 / 1600 // 2.375
-
-// Padding factor to ensure card doesn't touch edges
-const FIT_PADDING = 1.25
-
-// Distance multiplier for default angled view (farther from camera)
-const DEFAULT_DISTANCE_MULTIPLIER = 1.35
-
-// Default camera angle (in radians) - slight angle from the right
-const DEFAULT_AZIMUTH = -Math.PI * 0.1
-const DEFAULT_ELEVATION = Math.PI * 0.015 // ~3 degrees up
-
-// Minimum distance to prevent camera from getting too close
-const MIN_DISTANCE = 2
+import {
+    calculateFitDistance,
+    FIT_PADDING,
+    FIT_PADDING_MOBILE,
+    getViewerEntryCameraPose,
+    isMobileViewport,
+    SLAB_HEIGHT,
+    SLAB_WIDTH,
+} from '../lib/transition/viewerPose'
 
 // Animation duration for smooth transitions
 const TRANSITION_DURATION = 600 // ms
@@ -28,31 +21,6 @@ const RESIZE_LERP_FACTOR = 0.12
 // Easing function: ease-out cubic
 function easeOutCubic(t: number): number {
     return 1 - Math.pow(1 - t, 3)
-}
-
-/**
- * Calculate the camera distance needed to fit an object in the viewport
- */
-function calculateFitDistance(
-    objectWidth: number,
-    objectHeight: number,
-    fov: number,
-    aspect: number,
-    padding: number = FIT_PADDING
-): number {
-    const fovRad = (fov * Math.PI) / 180
-
-    // Distance needed to fit the object height in view
-    const distanceForHeight = objectHeight / 2 / Math.tan(fovRad / 2)
-
-    // Distance needed to fit the object width in view
-    // Account for aspect ratio - horizontal FOV is derived from vertical FOV
-    const distanceForWidth = objectWidth / 2 / (Math.tan(fovRad / 2) * aspect)
-
-    // Use the larger distance to ensure the object fits both dimensions
-    const distance = Math.max(distanceForHeight, distanceForWidth) * padding
-
-    return Math.max(distance, MIN_DISTANCE)
 }
 
 export interface UseAutoFitCameraOptions {
@@ -90,28 +58,25 @@ export function useAutoFitCamera(options: UseAutoFitCameraOptions = {}): UseAuto
     // Whether we're currently interpolating during resize
     const isResizeInterpolatingRef = useRef(false)
 
+    const isMobile = isMobileViewport(size.width)
+
     // Calculate the distance needed to fit the card
     const getAutoFitDistance = useCallback(() => {
         const fov = (camera as THREE.PerspectiveCamera).fov || 45
         const aspect = size.width / size.height
-        return calculateFitDistance(CARD_WIDTH, CARD_HEIGHT, fov, aspect)
-    }, [camera, size.width, size.height])
+        const padding = isMobile ? FIT_PADDING_MOBILE : FIT_PADDING
+        return calculateFitDistance(SLAB_WIDTH, SLAB_HEIGHT, fov, aspect, padding)
+    }, [camera, size.width, size.height, isMobile])
 
     // Calculate angled camera position from distance
-    const getAngledPosition = useCallback((distance: number): [number, number, number] => {
-        // Apply distance multiplier for farther view
-        const angledDistance = distance * DEFAULT_DISTANCE_MULTIPLIER
-
-        // Convert spherical to cartesian coordinates
-        // x = distance * sin(azimuth) * cos(elevation)
-        // y = distance * sin(elevation)
-        // z = distance * cos(azimuth) * cos(elevation)
-        const x = angledDistance * Math.sin(DEFAULT_AZIMUTH) * Math.cos(DEFAULT_ELEVATION)
-        const y = angledDistance * Math.sin(DEFAULT_ELEVATION)
-        const z = angledDistance * Math.cos(DEFAULT_AZIMUTH) * Math.cos(DEFAULT_ELEVATION)
-
-        return [x, y, z]
-    }, [])
+    const getAngledPosition = useCallback((_: number): [number, number, number] => {
+        const pose = getViewerEntryCameraPose(
+            size.width,
+            size.height,
+            (camera as THREE.PerspectiveCamera).fov || 45
+        )
+        return pose.position
+    }, [camera, size.height, size.width])
 
     // Apply auto-fit camera position immediately (for initial setup)
     const applyAutoFitImmediate = useCallback(() => {

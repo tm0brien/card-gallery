@@ -11,30 +11,30 @@
   --font-serif: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Background (defaults match study theme - overridden by JS) */
-  --bg-gradient-center: #1F1C18;
-  --bg-gradient-mid: #161412;
-  --bg-gradient-edge: #0C0B09;
-  --bg-vignette-opacity: 0.55;
-  --bg-vignette-start: 25%;
+  /* Background (defaults match gallery theme - overridden by JS) */
+  --bg-gradient-center: #FBFAF7;
+  --bg-gradient-mid: #F7F5F0;
+  --bg-gradient-edge: #F3F0EA;
+  --bg-vignette-opacity: 0.035;
+  --bg-vignette-start: 68%;
   --bg-vignette-edge-only: 1;
-  --bg-texture-opacity: 0.035;
-  --bg-grain-opacity: 0.028;
+  --bg-texture-opacity: 0;
+  --bg-grain-opacity: 0;
   --bg-grain-animation: none;
 
   /* UI Panel */
-  --panel-bg: rgba(22, 20, 18, 0.92);
-  --panel-border: rgba(255, 200, 120, 0.08);
-  --panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --panel-bg: rgba(251, 250, 247, 0.88);
+  --panel-border: rgba(30, 26, 20, 0.06);
+  --panel-shadow: 0 1px 2px rgba(20, 18, 14, 0.04);
   --panel-border-radius: 2px;
-  --panel-text-primary: #F5F1E8;
-  --panel-text-secondary: rgba(245, 241, 232, 0.52);
-  --panel-warmth: 0.05;
+  --panel-text-primary: #221f1a;
+  --panel-text-secondary: rgba(34, 31, 26, 0.52);
+  --panel-warmth: 0;
 
   /* Controls */
-  --controls-opacity: 0.35;
-  --controls-hover-opacity: 0.85;
-  --controls-show-on-interaction: 1;
+  --controls-opacity: 0.64;
+  --controls-hover-opacity: 0.92;
+  --controls-show-on-interaction: 0;
 
   /* Transitions */
   --transition-duration: 320ms;
@@ -73,36 +73,59 @@ a {
   overflow: hidden;
 }
 
+.collection-viewer {
+  background: #fff;
+}
+
 /* ============================================
    Cinematic Background Layers
    ============================================ */
 
-/* Warm radial gradient background */
+/* Quiet warm-white field */
 .background-gradient {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse 120% 100% at 50% 45%,
-    var(--bg-gradient-center) 0%,
-    var(--bg-gradient-mid) 45%,
-    var(--bg-gradient-edge) 100%
-  );
+  background: linear-gradient(180deg, var(--bg-gradient-center) 0%, var(--bg-gradient-mid) 58%, var(--bg-gradient-edge) 100%);
   z-index: 0;
 }
 
-/* Gallery theme - subtle centered spotlight (neutral) */
+.collection-viewer .background-gradient {
+  background: #fff;
+}
+
+.collection-viewer .background-gradient::before,
+.collection-viewer .background-gradient::after,
+.collection-viewer .texture-overlay,
+.collection-viewer .film-grain {
+  opacity: 0;
+  background: transparent;
+  animation: none;
+}
+
+.collection-viewer .vignette-overlay {
+  opacity: 1;
+  background: radial-gradient(
+    ellipse 88% 82% at 50% 42%,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0) 64%,
+    rgba(0, 0, 0, 0.01) 84%,
+    rgba(0, 0, 0, 0.022) 100%
+  );
+}
+
+/* Gallery theme - subtle centered lift */
 .background-gradient::before {
   content: '';
   position: absolute;
-  top: 35%;
+  top: 42%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 70%;
-  height: 55%;
+  width: 68%;
+  height: 46%;
   background: radial-gradient(
     ellipse at center,
-    rgba(255, 255, 255, 0.25) 0%,
-    transparent 65%
+    rgba(255, 255, 255, 0.18) 0%,
+    transparent 70%
   );
   pointer-events: none;
   opacity: 0;
@@ -110,7 +133,7 @@ a {
 }
 
 [data-theme="gallery"] .background-gradient::before {
-  opacity: 1;
+  opacity: 0.55;
 }
 
 /* Study theme - primary desk lamp glow (warm, upper-left biased) */
@@ -183,14 +206,14 @@ a {
   z-index: 1;
 }
 
-/* Gallery theme - lighter vignette */
+/* Gallery theme - nearly imperceptible vignette */
 [data-theme="gallery"] .vignette-overlay {
   background: radial-gradient(
-    ellipse 90% 85% at center,
+    ellipse 94% 90% at center,
     transparent 0%,
-    transparent 55%,
-    rgba(0, 0, 0, 0.04) 75%,
-    rgba(0, 0, 0, 0.12) 100%
+    transparent 72%,
+    rgba(0, 0, 0, 0.015) 88%,
+    rgba(0, 0, 0, 0.035) 100%
   );
 }
 
@@ -221,10 +244,9 @@ a {
   mix-blend-mode: multiply;
 }
 
-/* Gallery theme - lighter blend */
+/* Gallery theme - no texture */
 [data-theme="gallery"] .texture-overlay {
-  mix-blend-mode: multiply;
-  opacity: 0.018;
+  opacity: 0;
 }
 
 /* Study theme - warmer, more tactile */
@@ -273,23 +295,16 @@ a {
 
 .canvas-container canvas {
   display: block;
+  touch-action: none;
 }
 
 /* ============================================
-   Theme Switcher (Gallery Lighting Control)
-   Museum-style subtle toggle
+   Theme Switcher (Custom Dropdown)
    ============================================ */
 .theme-switcher {
   position: fixed;
-  top: 28px;
-  right: 28px;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 0;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--panel-border-radius);
+  bottom: 28px;
+  left: 28px;
   z-index: 50;
   opacity: var(--controls-opacity);
   transition: opacity var(--transition-duration) var(--transition-easing);
@@ -299,50 +314,161 @@ a {
   opacity: var(--controls-hover-opacity);
 }
 
-.theme-switcher-option {
-  position: relative;
+.theme-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 9px 14px;
-  background: transparent;
-  border: none;
-  color: var(--panel-text-secondary);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  cursor: pointer;
+  transition: color var(--transition-duration) var(--transition-easing),
+              border-color var(--transition-duration) var(--transition-easing);
+}
+
+.theme-switcher-trigger:hover {
+  border-color: rgba(128, 128, 128, 0.3);
+}
+
+.theme-switcher-label {
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: color var(--transition-duration) var(--transition-easing),
-              background var(--transition-duration) var(--transition-easing);
+  color: var(--panel-text-secondary);
 }
 
-.theme-switcher-option:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 11px;
-  background: var(--panel-border);
-}
-
-.theme-switcher-option:hover {
+.theme-switcher-trigger:hover .theme-switcher-label {
   color: var(--panel-text-primary);
 }
 
-.theme-switcher-option.active {
+.theme-switcher-chevron {
+  color: var(--panel-text-secondary);
+  opacity: 0.6;
+  transition: transform 200ms ease;
+}
+
+.theme-switcher-chevron-open {
+  transform: rotate(180deg);
+}
+
+.theme-switcher-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  box-shadow: var(--panel-shadow), 0 8px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.theme-switcher-item {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--panel-text-secondary);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.theme-switcher-item:not(:last-child) {
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.theme-switcher-item:hover {
   color: var(--panel-text-primary);
   background: rgba(128, 128, 128, 0.06);
 }
 
-/* Mobile adjustments */
+.theme-switcher-item-active {
+  color: var(--panel-text-primary);
+  font-weight: 500;
+}
+
 @media (max-width: 640px) {
   .theme-switcher {
-    top: 16px;
-    right: 16px;
+    bottom: 16px;
+    left: 16px;
   }
 
-  .theme-switcher-option {
+  .theme-switcher-trigger {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .theme-switcher-label {
+    font-size: 10px;
+  }
+
+  .theme-switcher-item {
     padding: 8px 10px;
     font-size: 10px;
   }
+}
+
+/* ============================================
+   Route Transitions
+   ============================================ */
+.route-shell {
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+              filter 240ms ease;
+  will-change: opacity, transform, filter;
+}
+
+.route-shell--exiting {
+  opacity: 0;
+  transform: scale(0.992);
+  filter: saturate(0.96);
+}
+
+.route-shell--entering {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.route-shell--hidden {
+  opacity: 0;
+}
+
+.route-shell--no-events {
+  pointer-events: none;
+}
+
+.route-ui-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 180ms ease;
+}
+
+.route-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.route-transition-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+  transition: opacity 180ms ease;
+}
+
+.route-transition-canvas {
+  position: absolute !important;
+  inset: 0;
 }

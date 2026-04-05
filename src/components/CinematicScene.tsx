@@ -19,13 +19,20 @@ function VerticalFalloffLight({ theme }: { theme: ThemeConfig }) {
 
     if (falloff <= 0) return null
 
+    const groundColor =
+        theme.name === 'night'
+            ? '#090b12'
+            : theme.name === 'study'
+                ? '#16110b'
+                : '#d8d2c8'
+
     // Use hemisphere light for natural vertical falloff
     // Sky color (top) is brighter, ground color (bottom) is darker
     return (
         <hemisphereLight
             color={theme.lighting.keyColor}
-            groundColor="#1a1510"
-            intensity={falloff * 0.5}
+            groundColor={groundColor}
+            intensity={falloff * 0.35}
             position={[0, 10, 0]}
         />
     )

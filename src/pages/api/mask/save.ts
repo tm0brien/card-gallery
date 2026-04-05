@@ -4,6 +4,10 @@ import path from 'path'
 
 const ASSETS_DIR = path.resolve(process.cwd(), 'public/assets')
 
+export const config = {
+  api: { bodyParser: { sizeLimit: '10mb' } },
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -12,10 +16,10 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { cardId, maskUrl } = req.body as { cardId: string; maskUrl: string }
+  const { cardId, maskDataUrl } = req.body as { cardId: string; maskDataUrl: string }
 
-  if (!cardId || !maskUrl) {
-    return res.status(400).json({ error: 'cardId and maskUrl are required' })
+  if (!cardId || !maskDataUrl) {
+    return res.status(400).json({ error: 'cardId and maskDataUrl are required' })
   }
 
   const cardDir = path.join(ASSETS_DIR, cardId)
@@ -24,10 +28,8 @@ export default async function handler(
   }
 
   try {
-    const response = await fetch(maskUrl)
-    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`)
-
-    const buffer = Buffer.from(await response.arrayBuffer())
+    const base64 = maskDataUrl.replace(/^data:image\/png;base64,/, '')
+    const buffer = Buffer.from(base64, 'base64')
     const maskPath = path.join(cardDir, 'mask.png')
     fs.writeFileSync(maskPath, buffer)
 

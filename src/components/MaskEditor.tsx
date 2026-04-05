@@ -2,31 +2,32 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import styles from '../styles/Remix.module.css'
 
-interface PointPrompt {
-  x: number
-  y: number
-  label: 0 | 1
-}
-
 interface MaskEditorProps {
   cardId: string
   imageUrl: string
   onMaskSaved: () => void
 }
 
-export default function MaskEditor({ cardId, imageUrl, onMaskSaved }: MaskEditorProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const imgRef = useRef<HTMLImageElement | null>(null)
+const OVERLAY_COLOR = 'rgba(100, 200, 255, 1)'
+const OVERLAY_ALPHA = 0.4
 
-  const [points, setPoints] = useState<PointPrompt[]>([])
-  const [tool, setTool] = useState<'include' | 'exclude'>('include')
-  const [maskUrl, setMaskUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+export default function MaskEditor({ cardId, imageUrl, onMaskSaved }: MaskEditorProps) {
+  const displayRef = useRef<HTMLCanvasElement>(null)
+  const maskRef = useRef<HTMLCanvasElement | null>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
+  const rafRef = useRef<number>(0)
+
+  const [tool, setTool] = useState<'paint' | 'erase'>('paint')
+  const [brushSize, setBrushSize] = useState(30)
   const [saving, setSaving] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [hasPainted, setHasPainted] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState('auto')
 
-  // Natural (full-res) dimensions of the source image
+  const isPainting = useRef(false)
+  const lastPos = useRef<{ x: number; y: number } | null>(null)
   const naturalSize = useRef({ w: 0, h: 0 })
+  const cursorPos = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const img = new Image()
@@ -34,134 +35,178 @@ export default function MaskEditor({ cardId, imageUrl, onMaskSaved }: MaskEditor
     img.onload = () => {
       imgRef.current = img
       naturalSize.current = { w: img.naturalWidth, h: img.naturalHeight }
+      setAspectRatio(`${img.naturalWidth} / ${img.naturalHeight}`)
+
+      const mask = document.createElement('canvas')
+      mask.width = img.naturalWidth
+      mask.height = img.naturalHeight
+      maskRef.current = mask
+
       setImgLoaded(true)
     }
     img.src = imageUrl
   }, [imageUrl])
 
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current
+  const redraw = useCallback(() => {
+    const canvas = displayRef.current
     const img = imgRef.current
-    if (!canvas || !img) return
+    const mask = maskRef.current
+    if (!canvas || !img || !mask) return
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
+    const ctx = canvas.getContext('2d')!
     const rect = canvas.getBoundingClientRect()
     const dpr = window.devicePixelRatio || 1
     canvas.width = rect.width * dpr
     canvas.height = rect.height * dpr
     ctx.scale(dpr, dpr)
 
-    const dispW = rect.width
-    const dispH = rect.height
+    const dw = rect.width
+    const dh = rect.height
 
-    ctx.clearRect(0, 0, dispW, dispH)
-    ctx.drawImage(img, 0, 0, dispW, dispH)
+    ctx.drawImage(img, 0, 0, dw, dh)
 
-    // Draw mask overlay if we have one
-    if (maskUrl) {
-      const maskImg = new Image()
-      maskImg.crossOrigin = 'anonymous'
-      maskImg.onload = () => {
-        ctx.globalAlpha = 0.45
-        ctx.drawImage(maskImg, 0, 0, dispW, dispH)
-        ctx.globalAlpha = 1.0
-        drawPoints(ctx, dispW, dispH)
-      }
-      maskImg.src = maskUrl
-    } else {
-      drawPoints(ctx, dispW, dispH)
-    }
-  }, [maskUrl, points, imageUrl])
+    // Colored overlay where the mask is painted (white-on-transparent → tinted)
+    const tmp = document.createElement('canvas')
+    tmp.width = canvas.width
+    tmp.height = canvas.height
+    const tc = tmp.getContext('2d')!
+    tc.scale(dpr, dpr)
+    tc.drawImage(mask, 0, 0, dw, dh)
+    tc.globalCompositeOperation = 'source-in'
+    tc.fillStyle = OVERLAY_COLOR
+    tc.fillRect(0, 0, dw, dh)
 
-  const drawPoints = (ctx: CanvasRenderingContext2D, dispW: number, dispH: number) => {
-    const natW = naturalSize.current.w
-    const natH = naturalSize.current.h
-    if (!natW || !natH) return
+    ctx.globalAlpha = OVERLAY_ALPHA
+    ctx.drawImage(tmp, 0, 0, tmp.width, tmp.height, 0, 0, dw, dh)
+    ctx.globalAlpha = 1.0
 
-    for (const p of points) {
-      const dx = (p.x / natW) * dispW
-      const dy = (p.y / natH) * dispH
+    if (cursorPos.current) {
+      const { x, y } = cursorPos.current
       ctx.beginPath()
-      ctx.arc(dx, dy, 6, 0, Math.PI * 2)
-      ctx.fillStyle = p.label === 1 ? 'rgba(100, 200, 255, 0.9)' : 'rgba(255, 100, 100, 0.9)'
-      ctx.fill()
-      ctx.strokeStyle = '#fff'
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'
       ctx.lineWidth = 1.5
       ctx.stroke()
     }
+  }, [brushSize])
+
+  const scheduleRedraw = useCallback(() => {
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => redraw())
+  }, [redraw])
+
+  useEffect(() => {
+    if (imgLoaded) scheduleRedraw()
+  }, [imgLoaded, scheduleRedraw])
+
+  useEffect(() => {
+    const h = () => scheduleRedraw()
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [scheduleRedraw])
+
+  const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = displayRef.current!.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top, rect }
   }
 
-  useEffect(() => {
-    if (imgLoaded) draw()
-  }, [imgLoaded, draw])
+  const paintAt = (x: number, y: number, rect: DOMRect) => {
+    const ctx = maskRef.current!.getContext('2d')!
+    const scaleX = naturalSize.current.w / rect.width
+    const scaleY = naturalSize.current.h / rect.height
+    const r = (brushSize / 2) * scaleX
 
-  useEffect(() => {
-    const handleResize = () => draw()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [draw])
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current
-    if (!canvas || !imgRef.current) return
-
-    const rect = canvas.getBoundingClientRect()
-    const clickX = e.clientX - rect.left
-    const clickY = e.clientY - rect.top
-
-    const natW = naturalSize.current.w
-    const natH = naturalSize.current.h
-    const natX = Math.round((clickX / rect.width) * natW)
-    const natY = Math.round((clickY / rect.height) * natH)
-
-    const label: 0 | 1 = tool === 'include' ? 1 : 0
-    setPoints((prev) => [...prev, { x: natX, y: natY, label }])
-  }
-
-  useEffect(() => {
-    if (points.length === 0) return
-
-    const timer = setTimeout(() => {
-      generateMask()
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [points])
-
-  const generateMask = async () => {
-    if (points.length === 0) return
-
-    setLoading(true)
-    try {
-      const fullUrl = `${window.location.origin}${imageUrl}`
-      const res = await fetch('/api/mask/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: fullUrl, points }),
-      })
-
-      if (!res.ok) throw new Error('Failed to generate mask')
-      const data = await res.json()
-      setMaskUrl(data.maskUrl)
-    } catch (err) {
-      console.error('Mask generation failed:', err)
-    } finally {
-      setLoading(false)
+    if (tool === 'erase') {
+      ctx.globalCompositeOperation = 'destination-out'
+    } else {
+      ctx.globalCompositeOperation = 'source-over'
     }
+    ctx.fillStyle = '#fff'
+    ctx.beginPath()
+    ctx.arc(x * scaleX, y * scaleY, r, 0, Math.PI * 2)
+    ctx.fill()
   }
 
-  const handleSaveMask = async () => {
-    if (!maskUrl) return
+  const paintLine = (x1: number, y1: number, x2: number, y2: number, rect: DOMRect) => {
+    const ctx = maskRef.current!.getContext('2d')!
+    const scaleX = naturalSize.current.w / rect.width
+    const scaleY = naturalSize.current.h / rect.height
+    const w = brushSize * scaleX
+
+    if (tool === 'erase') {
+      ctx.globalCompositeOperation = 'destination-out'
+    } else {
+      ctx.globalCompositeOperation = 'source-over'
+    }
+    ctx.strokeStyle = '#fff'
+    ctx.lineWidth = w
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    ctx.moveTo(x1 * scaleX, y1 * scaleY)
+    ctx.lineTo(x2 * scaleX, y2 * scaleY)
+    ctx.stroke()
+  }
+
+  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    isPainting.current = true
+    const { x, y, rect } = getPos(e)
+    paintAt(x, y, rect)
+    lastPos.current = { x, y }
+    setHasPainted(true)
+    scheduleRedraw()
+  }
+
+  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y, rect } = getPos(e)
+    cursorPos.current = { x, y }
+    if (isPainting.current && lastPos.current) {
+      paintLine(lastPos.current.x, lastPos.current.y, x, y, rect)
+      lastPos.current = { x, y }
+    }
+    scheduleRedraw()
+  }
+
+  const onMouseUp = () => {
+    isPainting.current = false
+    lastPos.current = null
+  }
+
+  const onMouseLeave = () => {
+    isPainting.current = false
+    lastPos.current = null
+    cursorPos.current = null
+    scheduleRedraw()
+  }
+
+  const handleReset = () => {
+    const mask = maskRef.current
+    if (!mask) return
+    mask.getContext('2d')!.clearRect(0, 0, mask.width, mask.height)
+    setHasPainted(false)
+    scheduleRedraw()
+  }
+
+  const handleSave = async () => {
+    const mask = maskRef.current
+    if (!mask) return
 
     setSaving(true)
     try {
+      const out = document.createElement('canvas')
+      out.width = mask.width
+      out.height = mask.height
+      const ctx = out.getContext('2d')!
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, out.width, out.height)
+      ctx.drawImage(mask, 0, 0)
+
+      const dataUrl = out.toDataURL('image/png')
       const res = await fetch('/api/mask/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId, maskUrl }),
+        body: JSON.stringify({ cardId, maskDataUrl: dataUrl }),
       })
-
       if (!res.ok) throw new Error('Failed to save mask')
       onMaskSaved()
     } catch (err) {
@@ -171,40 +216,46 @@ export default function MaskEditor({ cardId, imageUrl, onMaskSaved }: MaskEditor
     }
   }
 
-  const handleReset = () => {
-    setPoints([])
-    setMaskUrl(null)
-  }
-
   return (
     <div className={styles.editorSection}>
       <h2 className={styles.sectionTitle}>Define Mask</h2>
       <p className={styles.sectionHint}>
-        Click on the card artwork to select the area AI will replace. Use <strong>Include</strong> to
-        add regions, <strong>Exclude</strong> to remove them.
+        Paint over the area AI should replace. Use <strong>Paint</strong> to mark areas and{' '}
+        <strong>Erase</strong> to remove them.
       </p>
 
       <div className={styles.toolBar}>
         <button
-          className={`${styles.toolBtn} ${tool === 'include' ? styles.toolBtnActive : ''}`}
-          onClick={() => setTool('include')}
+          className={`${styles.toolBtn} ${tool === 'paint' ? styles.toolBtnActive : ''}`}
+          onClick={() => setTool('paint')}
         >
-          <span className={styles.includeDot} /> Include
+          <span className={styles.includeDot} /> Paint
         </button>
         <button
-          className={`${styles.toolBtn} ${tool === 'exclude' ? styles.toolBtnActive : ''}`}
-          onClick={() => setTool('exclude')}
+          className={`${styles.toolBtn} ${tool === 'erase' ? styles.toolBtnActive : ''}`}
+          onClick={() => setTool('erase')}
         >
-          <span className={styles.excludeDot} /> Exclude
+          <span className={styles.excludeDot} /> Erase
         </button>
+        <label className={styles.brushLabel}>
+          Size
+          <input
+            type="range"
+            min="5"
+            max="100"
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+            className={styles.brushSlider}
+          />
+        </label>
         <div className={styles.toolSpacer} />
-        <button className={styles.toolBtn} onClick={handleReset} disabled={points.length === 0}>
+        <button className={styles.toolBtn} onClick={handleReset} disabled={!hasPainted}>
           Reset
         </button>
         <button
           className={`${styles.toolBtn} ${styles.saveBtn}`}
-          onClick={handleSaveMask}
-          disabled={!maskUrl || saving}
+          onClick={handleSave}
+          disabled={!hasPainted || saving}
         >
           {saving ? 'Saving…' : 'Save Mask'}
         </button>
@@ -212,16 +263,14 @@ export default function MaskEditor({ cardId, imageUrl, onMaskSaved }: MaskEditor
 
       <div className={styles.canvasWrap}>
         <canvas
-          ref={canvasRef}
+          ref={displayRef}
           className={styles.canvas}
-          onClick={handleCanvasClick}
-          style={{ cursor: tool === 'include' ? 'crosshair' : 'not-allowed' }}
+          style={{ aspectRatio }}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseLeave}
         />
-        {loading && (
-          <div className={styles.canvasLoading}>
-            <span>Segmenting…</span>
-          </div>
-        )}
       </div>
     </div>
   )

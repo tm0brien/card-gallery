@@ -145,43 +145,40 @@ export interface ThemeConfig {
 export const galleryTheme: ThemeConfig = {
     name: 'gallery',
     background: {
-        // Clean off-white gallery walls
-        gradientCenter: '#F8F6F3',
-        gradientMid: '#F4F2EF',
-        gradientEdge: '#E8E5E0',
-        vignetteOpacity: 0.12,
-        vignetteStart: 50,
+        // Quiet warm-white field that lets the cards do the work
+        gradientCenter: '#FBFAF7',
+        gradientMid: '#F7F5F0',
+        gradientEdge: '#F3F0EA',
+        vignetteOpacity: 0.035,
+        vignetteStart: 68,
         vignetteEdgeOnly: true,
-        textureOpacity: 0.02, // Very subtle paper grain
-        filmGrainOpacity: 0.015,
+        textureOpacity: 0,
+        filmGrainOpacity: 0,
         filmGrainAnimated: false
     },
     lighting: {
-        // Balanced, professional 3-point rig
-        ambientIntensity: 0.7,
-        ambientColor: '#fffbf7',
-        // Key: slightly warm, upper-left
-        keyIntensity: 0.85,
-        keyColor: '#fffaf5',
-        keyPosition: [-3, 4, 5],
-        // Fill: neutral, lower intensity
-        fillIntensity: 0.45,
-        fillColor: '#fff9f4',
-        fillPosition: [4, 0.5, 3],
-        // Rim: faint back-right
-        rimIntensity: 0.25,
+        // Bright, overhead-biased light with minimal drama
+        ambientIntensity: 0.92,
+        ambientColor: '#fffdf9',
+        keyIntensity: 0.52,
+        keyColor: '#fffaf2',
+        keyPosition: [1.5, 8.5, 2.5],
+        fillIntensity: 0.18,
+        fillColor: '#ffffff',
+        fillPosition: [-5, 5, 1.5],
+        rimIntensity: 0.06,
         rimColor: '#ffffff',
-        rimPosition: [3, 2.5, -3],
-        envMapIntensity: 0.15,
-        verticalFalloff: 0.1
+        rimPosition: [0, 4, -4],
+        envMapIntensity: 0.08,
+        verticalFalloff: 0.02
     },
     shadow: {
-        // Gallery: clean, minimal, neutral grounding
-        opacity: 0.18,
-        blur: 2.8,
-        scale: 8,
+        // A light contact shadow just to ground the slab
+        opacity: 0.1,
+        blur: 4.6,
+        scale: 7.5,
         far: 4,
-        color: '#3a352e',
+        color: '#b7afa4',
         position: [0, -1.22, 0]
     },
     camera: {
@@ -206,16 +203,16 @@ export const galleryTheme: ThemeConfig = {
         normalScale: 0
     },
     ui: {
-        // Light, professional panel
-        panelBackground: 'rgba(248, 246, 243, 0.95)',
-        panelBorderColor: 'rgba(0, 0, 0, 0.05)',
-        panelShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+        // Lightweight editorial UI
+        panelBackground: 'rgba(251, 250, 247, 0.88)',
+        panelBorderColor: 'rgba(30, 26, 20, 0.06)',
+        panelShadow: '0 1px 2px rgba(20, 18, 14, 0.04)',
         panelBorderRadius: 3,
-        panelTextPrimary: '#2C2825',
-        panelTextSecondary: 'rgba(44, 40, 37, 0.58)',
-        panelWarmth: 0.02,
-        controlsOpacity: 0.5,
-        controlsHoverOpacity: 0.9,
+        panelTextPrimary: '#221f1a',
+        panelTextSecondary: 'rgba(34, 31, 26, 0.52)',
+        panelWarmth: 0,
+        controlsOpacity: 0.64,
+        controlsHoverOpacity: 0.92,
         controlsShowOnInteractionOnly: false,
         transitionDuration: 280,
         transitionEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1.0)'
@@ -241,22 +238,22 @@ export const studyTheme: ThemeConfig = {
     },
     lighting: {
         // Biased 3-light rig: upper-left desk lamp feel
-        ambientIntensity: 0.28,
-        ambientColor: '#2d2418',
-        // Key: warm + dominant from upper-left (the desk lamp)
-        keyIntensity: 1.15,
-        keyColor: '#ffc878',
+        ambientIntensity: 0.42,
+        ambientColor: '#f3eee6',
+        // Key: warm and directional, but no longer so orange that it muddies print colors
+        keyIntensity: 1.0,
+        keyColor: '#ffd39a',
         keyPosition: [-3.5, 4, 4],
-        // Fill: lower intensity, warm
-        fillIntensity: 0.32,
-        fillColor: '#ffd090',
+        // Fill: softer and more neutral so the card keeps true colors
+        fillIntensity: 0.4,
+        fillColor: '#f6efe5',
         fillPosition: [4, 0, 3.5],
         // Rim: faint from back-right to catch slab edges
-        rimIntensity: 0.38,
-        rimColor: '#ffb060',
+        rimIntensity: 0.24,
+        rimColor: '#ffe2bc',
         rimPosition: [3.5, 2, -2.5],
-        envMapIntensity: 0.08,
-        verticalFalloff: 0.18 // Strongest sense of presence through light
+        envMapIntensity: 0.16,
+        verticalFalloff: 0.09 // Keep shape without noticeably dimming the card face
     },
     shadow: {
         // Study: warm light bias, strongest sense of presence
@@ -282,11 +279,11 @@ export const studyTheme: ThemeConfig = {
         idleDelay: 3500
     },
     material: {
-        roughness: 0.35,
+        roughness: 0.33,
         metalness: 0,
-        clearcoat: 0.28,
-        clearcoatRoughness: 0.35,
-        envMapIntensity: 0.1,
+        clearcoat: 0.48,
+        clearcoatRoughness: 0.22,
+        envMapIntensity: 0.16,
         normalScale: 0.015
     },
     ui: {
@@ -324,23 +321,23 @@ export const nightTheme: ThemeConfig = {
         filmGrainAnimated: false
     },
     lighting: {
-        // Subdued, slightly cool - like moonlight through curtains
-        ambientIntensity: 0.2,
-        ambientColor: '#1a1a22',
-        // Key: muted warm, still upper-left
-        keyIntensity: 0.75,
-        keyColor: '#e8dcd0',
+        // Dark environment, but with a cleaner neutral lift on the card itself
+        ambientIntensity: 0.4,
+        ambientColor: '#eceff6',
+        // Key: gentle and slightly warm, still upper-left
+        keyIntensity: 0.88,
+        keyColor: '#f5ede4',
         keyPosition: [-3, 3.5, 4.5],
-        // Fill: very low
-        fillIntensity: 0.22,
-        fillColor: '#d8d0c8',
+        // Fill: enough to keep the artwork readable while the room stays dark
+        fillIntensity: 0.34,
+        fillColor: '#eef2fa',
         fillPosition: [4, 0, 3],
         // Rim: subtle
-        rimIntensity: 0.28,
-        rimColor: '#c8c0b8',
+        rimIntensity: 0.22,
+        rimColor: '#dbe2f2',
         rimPosition: [3, 2, -3],
-        envMapIntensity: 0.05,
-        verticalFalloff: 0.14 // Light falloff does most grounding work
+        envMapIntensity: 0.12,
+        verticalFalloff: 0.07 // Keep mood in the scene, not in crushed card exposure
     },
     shadow: {
         // Night: vignette + light falloff does most grounding
@@ -366,11 +363,11 @@ export const nightTheme: ThemeConfig = {
         idleDelay: 5000
     },
     material: {
-        roughness: 0.38,
+        roughness: 0.34,
         metalness: 0,
-        clearcoat: 0.22,
-        clearcoatRoughness: 0.4,
-        envMapIntensity: 0.06,
+        clearcoat: 0.42,
+        clearcoatRoughness: 0.24,
+        envMapIntensity: 0.14,
         normalScale: 0.01
     },
     ui: {
@@ -400,7 +397,7 @@ export const themes: Record<ThemeMode, ThemeConfig> = {
 }
 
 // Default theme
-export const defaultTheme: ThemeMode = 'study'
+export const defaultTheme: ThemeMode = 'gallery'
 
 // Helper to get theme config
 export function getTheme(mode: ThemeMode): ThemeConfig {

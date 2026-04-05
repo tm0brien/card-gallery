@@ -2,11 +2,16 @@ import fs from 'fs'
 import path from 'path'
 
 import Head from 'next/head'
-import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { type MouseEvent, useCallback, useRef, useState } from 'react'
 
 import type { GetServerSideProps } from 'next'
 
+import RemixGallery from '../../../components/RemixGallery'
+import RemixModal from '../../../components/RemixModal'
 import Root from '../../../components/Root'
+import type { DetailViewerSnapshot } from '../../../context/RouteTransitionContext'
+import { useRouteTransition } from '../../../context/RouteTransitionContext'
 import { getCards } from '../../../lib/cards'
 import styles from '../../../styles/Gallery.module.css'
 import type { CardSummary } from '../../../types/card'
@@ -14,6 +19,7 @@ import type { CardSummary } from '../../../types/card'
 interface CardPageProps {
     card: CardSummary
     baseUrl: string
+    hasLocalAssets: boolean
     ogDescription: string
 }
 
@@ -43,7 +49,7 @@ export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
             path.join(process.cwd(), 'public', 'assets', id, 'back.png'),
         )
 
-    if (!card || !hasLocalAssets) {
+    if (!card) {
         return { redirect: { destination: '/', permanent: false } }
     }
 
@@ -56,6 +62,7 @@ export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
         props: {
             card,
             baseUrl,
+            hasLocalAssets,
             ogDescription: buildDescription(card),
         },
     }
@@ -64,10 +71,52 @@ export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
 export default function CardPage({
     card,
     baseUrl,
+    hasLocalAssets,
     ogDescription,
 }: CardPageProps) {
+    const router = useRouter()
     const ogImageUrl = `${baseUrl}/api/og/${card.id}`
     const cardUrl = `${baseUrl}/card/${card.id}`
+    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null)
+    const [showRemix, setShowRemix] = useState(false)
+    const snapshotGetterRef = useRef<(() => DetailViewerSnapshot | null) | null>(null)
+    const {
+        beginCardToCollection,
+        isCardRouteEntering,
+        isCardRouteExiting,
+        isCardRouteHidden,
+        notifyCardRouteReady,
+        shouldSuppressDetailUi,
+    } = useRouteTransition()
+
+    const gradeLabel = `${card.grade.company} ${card.grade.score}`
+    const suppressUi = shouldSuppressDetailUi(card.id)
+    const routeClassName = [
+        'route-shell',
+        isCardRouteEntering(card.id) ? 'route-shell--entering' : '',
+        isCardRouteExiting(card.id) ? 'route-shell--exiting' : '',
+        isCardRouteHidden(card.id) ? 'route-shell--hidden' : '',
+    ]
+        .filter(Boolean)
+        .join(' ')
+
+    const handleOpenRemix = useCallback(() => setShowRemix(true), [])
+    const handleCloseRemix = useCallback(() => setShowRemix(false), [])
+    const handleSceneReady = useCallback(() => {
+        notifyCardRouteReady(card.id)
+    }, [card.id, notifyCardRouteReady])
+    const handleBack = useCallback(
+        (event: MouseEvent<HTMLButtonElement>) => {
+            event.preventDefault()
+            const snapshot = snapshotGetterRef.current?.()
+            if (!snapshot) {
+                router.push('/')
+                return
+            }
+            beginCardToCollection(card.id, snapshot)
+        },
+        [beginCardToCollection, card.id, router]
+    )
 
     return (
         <>
@@ -91,18 +140,45 @@ export default function CardPage({
                 <meta name="twitter:image" content={ogImageUrl} />
             </Head>
 
-            <Root assetPath={`/assets/${card.id}`} />
+            <Root
+                assetPath={`/assets/${card.id}`}
+                hasAssets={hasLocalAssets}
+                activeVideoUrl={activeVideoUrl}
+                className={routeClassName}
+                suppressUi={suppressUi}
+                onSceneReady={handleSceneReady}
+                registerSnapshotGetter={(getter) => {
+                    snapshotGetterRef.current = getter
+                }}
+            />
 
-            <Link href="/" className={styles.backButton}>
-                ← Collection
-            </Link>
-
-            <Link
-                href={`/card/${card.id}/remix`}
-                className={styles.remixButton}
+            <button
+                type="button"
+                className={`${styles.backButton} ${suppressUi ? 'route-ui-hidden' : ''}`}
+                onClick={handleBack}
             >
-                ✦ Remix
-            </Link>
+                ← Collection
+            </button>
+
+            {hasLocalAssets && (
+                <RemixGallery
+                    cardId={card.id}
+                    orientation={card.orientation ?? 'portrait'}
+                    onSelectVideo={setActiveVideoUrl}
+                    activeVideoUrl={activeVideoUrl}
+                    onOpenRemix={handleOpenRemix}
+                    hidden={suppressUi}
+                />
+            )}
+
+            {hasLocalAssets && showRemix && (
+                <RemixModal
+                    cardId={card.id}
+                    cardTitle={card.title}
+                    gradeLabel={gradeLabel}
+                    onClose={handleCloseRemix}
+                />
+            )}
         </>
     )
 }

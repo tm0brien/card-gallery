@@ -232,7 +232,23 @@
 .canvas {
   display: block;
   width: 100%;
-  aspect-ratio: 5 / 7;
+  cursor: none;
+}
+
+.brushLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--panel-text-secondary);
+  letter-spacing: 0.02em;
+  margin-left: 8px;
+}
+
+.brushSlider {
+  width: 80px;
+  accent-color: rgba(100, 200, 255, 0.8);
 }
 
 .canvasLoading {
@@ -358,6 +374,157 @@
   font-size: 12px;
   color: rgba(255, 120, 100, 0.9);
   margin: 0 0 16px;
+}
+
+/* ============================================
+   Controls Row (Video Remix settings)
+   ============================================ */
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.controlLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--panel-text-secondary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.controlValue {
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+  text-align: right;
+}
+
+.segmentedControl {
+  display: flex;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-border-radius);
+  overflow: hidden;
+}
+
+.segmentBtn {
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--panel-border);
+  color: var(--panel-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.segmentBtn:last-child {
+  border-right: none;
+}
+
+.segmentBtn:hover {
+  color: var(--panel-text-primary);
+}
+
+.segmentBtnActive {
+  color: var(--panel-text-primary);
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--panel-text-secondary);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.checkbox {
+  accent-color: rgba(100, 200, 255, 0.8);
+}
+
+.featherSlider {
+  width: 70px;
+  accent-color: rgba(100, 200, 255, 0.8);
+}
+
+.costHint {
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--panel-text-secondary);
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================
+   Video Remix
+   ============================================ */
+
+.videoCanvas {
+  display: block;
+  width: 100%;
+}
+
+.videoStatus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: rgba(100, 200, 255, 0.06);
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: var(--panel-border-radius);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--panel-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.playBtn {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  backdrop-filter: blur(4px);
+  line-height: 1;
+}
+
+.playBtn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* ============================================

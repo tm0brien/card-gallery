@@ -52,7 +52,7 @@ export default function RemixPanel({ cardId, imageUrl }: RemixPanelProps) {
       const res = await fetch('/api/remix/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId, imageUrl: remixUrl }),
+        body: JSON.stringify({ cardId, imageUrl: remixUrl, prompt: prompt.trim() }),
       })
 
       if (!res.ok) throw new Error('Failed to save remix')

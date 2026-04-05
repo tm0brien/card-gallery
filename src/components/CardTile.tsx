@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import Link from 'next/link'
 import { Suspense } from 'react'
 
+import { resolveCardOrientation } from '../lib/cardOrientation'
 import styles from '../styles/Gallery.module.css'
 import type { CardSummary } from '../types/card'
 import GalleryCardView from './GalleryCardView'
@@ -13,26 +14,19 @@ interface CardTileProps {
 export default function CardTile({ card }: CardTileProps) {
     const yearSet = [card.year, card.set, card.subset].filter(Boolean).join(' · ')
     const grade = `${card.grade.company} ${card.grade.score}`
-    const isLandscape = card.orientation === 'landscape'
+    const isLandscape = resolveCardOrientation(card) === 'landscape'
 
     const tileContent = (
         <div className={`${styles.tile} ${!card.hasAssets ? styles.tilePlaceholder : ''}`}>
             <div className={`${styles.imageContainer} ${isLandscape ? styles.imageContainerLandscape : ''}`}>
-                {card.hasAssets ? (
-                    <Canvas
-                        gl={{ alpha: true, antialias: true }}
-                        style={{ position: 'absolute', inset: 0 }}
-                    >
-                        <Suspense fallback={null}>
-                            <GalleryCardView card={card} />
-                        </Suspense>
-                    </Canvas>
-                ) : (
-                    <div className={styles.noImage}>
-                        <span className={styles.noImageIcon}>⬜</span>
-                        <span className={styles.noImageLabel}>Photo coming soon</span>
-                    </div>
-                )}
+                <Canvas
+                    gl={{ alpha: true, antialias: true }}
+                    style={{ position: 'absolute', inset: 0 }}
+                >
+                    <Suspense fallback={null}>
+                        <GalleryCardView card={card} />
+                    </Suspense>
+                </Canvas>
             </div>
 
             <div className={styles.info}>

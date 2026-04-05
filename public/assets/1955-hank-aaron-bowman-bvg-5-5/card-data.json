@@ -9,13 +9,7 @@
   "grade": {
     "company": "Beckett Grading Services",
     "score": "5.5",
-    "label": "Excellent",
-    "subgrades": {
-      "centering": "6",
-      "corners": "5",
-      "edges": "5.5",
-      "surface": "6"
-    }
+    "label": "Excellent"
   },
   "certificationNumber": "0012345678",
   "notes": "Light corner wear. Strong surface preservation."
