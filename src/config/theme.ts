@@ -127,6 +127,79 @@ export interface UIConfig {
 }
 
 // ============================================
+// Motion Configuration
+// Every animation in the experience reads from here
+// ============================================
+export interface MotionConfig {
+    cardTransitionDuration: number
+    cardTransitionEasing: [number, number, number, number]
+    cardEntryOffset: [number, number, number]
+    cardExitOffset: [number, number, number]
+    cardEntryRotation: [number, number, number]
+    cardExitRotation: [number, number, number]
+
+    focusDuration: number
+    focusEasing: [number, number, number, number]
+
+    springStiffness: number
+    springDamping: number
+    springMass: number
+
+    idleTiltAmplitude: number
+    idleTiltSpeed: number
+    idleDelay: number
+
+    cursorTiltStrength: number
+    cursorTiltSmoothing: number
+
+    scrollSensitivity: number
+    scrollMomentumDecay: number
+
+    presentationTilt: number
+}
+
+// ============================================
+// Atmosphere / Post-Processing Configuration
+// Every GPU effect reads from here
+// ============================================
+export interface AtmosphereConfig {
+    toneMapping: 'aces' | 'reinhard' | 'neutral'
+    toneMappingExposure: number
+
+    bloomEnabled: boolean
+    bloomStrength: number
+    bloomRadius: number
+    bloomThreshold: number
+
+    // DOF during browse (soft background) — disabled when inspecting
+    dofBrowseEnabled: boolean
+    dofFocusDistance: number
+    dofFocalLength: number
+    dofBokehScale: number
+
+    vignetteOffset: number
+    vignetteDarkness: number
+
+    grainIntensity: number
+    grainLuminanceOnly: boolean
+
+    // Chromatic aberration — subtle lens fringing
+    chromaticAberration: number
+
+    // Hue / saturation lift on final composite
+    saturation: number
+
+    envPreset: 'studio' | 'warehouse' | 'apartment' | 'city' | 'sunset' | 'night'
+    envIntensity: number
+    // Use custom Lightformer rig instead of HDRI preset
+    useCustomLightformers: boolean
+    // Lightformer intensities (only used when useCustomLightformers = true)
+    lightformerTopIntensity: number
+    lightformerRimIntensity: number
+    lightformerFillIntensity: number
+}
+
+// ============================================
 // Complete Theme Configuration
 // ============================================
 export interface ThemeConfig {
@@ -137,6 +210,8 @@ export interface ThemeConfig {
     camera: CameraConfig
     material: MaterialConfig
     ui: UIConfig
+    motion: MotionConfig
+    atmosphere: AtmosphereConfig
 }
 
 // ============================================
@@ -203,7 +278,6 @@ export const galleryTheme: ThemeConfig = {
         normalScale: 0
     },
     ui: {
-        // Lightweight editorial UI
         panelBackground: 'rgba(251, 250, 247, 0.88)',
         panelBorderColor: 'rgba(30, 26, 20, 0.06)',
         panelShadow: '0 1px 2px rgba(20, 18, 14, 0.04)',
@@ -216,7 +290,52 @@ export const galleryTheme: ThemeConfig = {
         controlsShowOnInteractionOnly: false,
         transitionDuration: 280,
         transitionEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1.0)'
-    }
+    },
+    motion: {
+        cardTransitionDuration: 850,
+        cardTransitionEasing: [0.22, 1, 0.36, 1],
+        cardEntryOffset: [0, -5.5, -1.5],
+        cardExitOffset: [0, 5.5, -1.5],
+        cardEntryRotation: [0.08, 0, 0],
+        cardExitRotation: [-0.08, 0, 0],
+        focusDuration: 1000,
+        focusEasing: [0.22, 1, 0.36, 1],
+        springStiffness: 120,
+        springDamping: 18,
+        springMass: 1,
+        idleTiltAmplitude: 1.5,
+        idleTiltSpeed: 0.5,
+        idleDelay: 4000,
+        cursorTiltStrength: 3,
+        cursorTiltSmoothing: 0.07,
+        scrollSensitivity: 500,
+        scrollMomentumDecay: 0.95,
+        presentationTilt: 12,
+    },
+    atmosphere: {
+        toneMapping: 'aces',
+        toneMappingExposure: 1.0,
+        bloomEnabled: true,
+        bloomStrength: 0.2,
+        bloomRadius: 0.6,
+        bloomThreshold: 0.92,
+        dofBrowseEnabled: true,
+        dofFocusDistance: 0.0,
+        dofFocalLength: 0.035,
+        dofBokehScale: 2.5,
+        vignetteOffset: 0.4,
+        vignetteDarkness: 0.4,
+        grainIntensity: 0.015,
+        grainLuminanceOnly: true,
+        chromaticAberration: 0.0004,
+        saturation: 0.12,
+        envPreset: 'warehouse',
+        envIntensity: 0.12,
+        useCustomLightformers: true,
+        lightformerTopIntensity: 3.0,
+        lightformerRimIntensity: 1.5,
+        lightformerFillIntensity: 0.8,
+    },
 }
 
 // ============================================
@@ -287,7 +406,6 @@ export const studyTheme: ThemeConfig = {
         normalScale: 0.015
     },
     ui: {
-        // Warm, placard-like panel
         panelBackground: 'rgba(22, 20, 18, 0.92)',
         panelBorderColor: 'rgba(255, 200, 120, 0.08)',
         panelShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
@@ -300,7 +418,52 @@ export const studyTheme: ThemeConfig = {
         controlsShowOnInteractionOnly: true,
         transitionDuration: 320,
         transitionEasing: 'cubic-bezier(0.2, 0.0, 0.0, 1.0)'
-    }
+    },
+    motion: {
+        cardTransitionDuration: 950,
+        cardTransitionEasing: [0.2, 0, 0, 1],
+        cardEntryOffset: [0, -5.5, -1.5],
+        cardExitOffset: [0, 5.5, -1.5],
+        cardEntryRotation: [0.06, 0, 0],
+        cardExitRotation: [-0.06, 0, 0],
+        focusDuration: 1200,
+        focusEasing: [0.2, 0, 0, 1],
+        springStiffness: 100,
+        springDamping: 20,
+        springMass: 1.2,
+        idleTiltAmplitude: 1,
+        idleTiltSpeed: 0.4,
+        idleDelay: 3500,
+        cursorTiltStrength: 2.5,
+        cursorTiltSmoothing: 0.05,
+        scrollSensitivity: 550,
+        scrollMomentumDecay: 0.94,
+        presentationTilt: 15,
+    },
+    atmosphere: {
+        toneMapping: 'aces',
+        toneMappingExposure: 1.05,
+        bloomEnabled: true,
+        bloomStrength: 0.3,
+        bloomRadius: 0.5,
+        bloomThreshold: 0.88,
+        dofBrowseEnabled: true,
+        dofFocusDistance: 0.0,
+        dofFocalLength: 0.035,
+        dofBokehScale: 3,
+        vignetteOffset: 0.35,
+        vignetteDarkness: 0.6,
+        grainIntensity: 0.025,
+        grainLuminanceOnly: false,
+        chromaticAberration: 0.0005,
+        saturation: 0.1,
+        envPreset: 'apartment',
+        envIntensity: 0.12,
+        useCustomLightformers: true,
+        lightformerTopIntensity: 2.5,
+        lightformerRimIntensity: 1.8,
+        lightformerFillIntensity: 0.6,
+    },
 }
 
 // ============================================
@@ -371,7 +534,6 @@ export const nightTheme: ThemeConfig = {
         normalScale: 0.01
     },
     ui: {
-        // Whisper-quiet, nearly invisible
         panelBackground: 'rgba(16, 16, 18, 0.9)',
         panelBorderColor: 'rgba(255, 255, 255, 0.04)',
         panelShadow: '0 2px 12px rgba(0, 0, 0, 0.4)',
@@ -384,7 +546,52 @@ export const nightTheme: ThemeConfig = {
         controlsShowOnInteractionOnly: true,
         transitionDuration: 380,
         transitionEasing: 'cubic-bezier(0.2, 0.0, 0.0, 1.0)'
-    }
+    },
+    motion: {
+        cardTransitionDuration: 1050,
+        cardTransitionEasing: [0.2, 0, 0, 1],
+        cardEntryOffset: [0, -5.5, -1.5],
+        cardExitOffset: [0, 5.5, -1.5],
+        cardEntryRotation: [0.05, 0, 0],
+        cardExitRotation: [-0.05, 0, 0],
+        focusDuration: 1400,
+        focusEasing: [0.2, 0, 0, 1],
+        springStiffness: 80,
+        springDamping: 22,
+        springMass: 1.4,
+        idleTiltAmplitude: 0.6,
+        idleTiltSpeed: 0.3,
+        idleDelay: 5000,
+        cursorTiltStrength: 2,
+        cursorTiltSmoothing: 0.04,
+        scrollSensitivity: 600,
+        scrollMomentumDecay: 0.93,
+        presentationTilt: 12,
+    },
+    atmosphere: {
+        toneMapping: 'aces',
+        toneMappingExposure: 0.95,
+        bloomEnabled: true,
+        bloomStrength: 0.28,
+        bloomRadius: 0.5,
+        bloomThreshold: 0.85,
+        dofBrowseEnabled: true,
+        dofFocusDistance: 0.0,
+        dofFocalLength: 0.035,
+        dofBokehScale: 3.5,
+        vignetteOffset: 0.3,
+        vignetteDarkness: 0.72,
+        grainIntensity: 0.018,
+        grainLuminanceOnly: true,
+        chromaticAberration: 0.0006,
+        saturation: 0.08,
+        envPreset: 'city',
+        envIntensity: 0.1,
+        useCustomLightformers: true,
+        lightformerTopIntensity: 2.0,
+        lightformerRimIntensity: 1.4,
+        lightformerFillIntensity: 0.5,
+    },
 }
 
 // ============================================

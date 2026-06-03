@@ -19,6 +19,12 @@ const SHEET_GID = process.env.GOOGLE_SHEET_GID ?? '0'
 const MANIFEST_PATH = path.resolve(process.cwd(), 'public/data/cards.json')
 const ASSETS_DIR = path.resolve(process.cwd(), 'public/assets')
 
+/** Short-lived in-process cache so concurrent SSR/API calls share one resolution. */
+const CACHE_TTL_MS = 45_000
+let cacheManifest: CardManifest | null = null
+let cacheExpiresAt = 0
+let cacheInFlight: Promise<CardManifest> | null = null
+
 function hasAssets(id: string): boolean {
   const dir = path.join(ASSETS_DIR, id)
   return (
@@ -64,7 +70,7 @@ function writeCache(manifest: CardManifest): void {
   }
 }
 
-export async function getCards(): Promise<CardManifest> {
+async function getCardsUncached(): Promise<CardManifest> {
   // 1. Attempt live fetch
   if (SHEET_ID) {
     try {
@@ -106,4 +112,25 @@ export async function getCards(): Promise<CardManifest> {
   // 3. Nothing available
   console.error('[cards] No live data and no cache file found. Run `npm run sync-cards` to seed the cache.')
   return { version: 1, lastSynced: '', cards: [], source: 'empty' }
+}
+
+export async function getCards(): Promise<CardManifest> {
+  const now = Date.now()
+  if (cacheManifest && now < cacheExpiresAt) {
+    return cacheManifest
+  }
+  if (cacheInFlight) {
+    return cacheInFlight
+  }
+  const pending = getCardsUncached()
+    .then((manifest) => {
+      cacheManifest = manifest
+      cacheExpiresAt = Date.now() + CACHE_TTL_MS
+      return manifest
+    })
+    .finally(() => {
+      cacheInFlight = null
+    })
+  cacheInFlight = pending
+  return pending
 }

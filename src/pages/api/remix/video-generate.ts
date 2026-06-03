@@ -41,18 +41,15 @@ export default async function handler(
       .resize({ width: 1920, height: 1080, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 90 })
       .toBuffer()
-    const blob = new Blob([resized], { type: 'image/jpeg' })
+    const blob = new Blob([new Uint8Array(resized)], { type: 'image/jpeg' })
     const uploadedUrl = await fal.storage.upload(blob)
 
-    const input: Record<string, unknown> = {
+    const input = {
       prompt,
       image_url: uploadedUrl,
-      duration: String(duration),
+      duration,
       negative_prompt: 'blur, distort, low quality, face change, color shift',
-    }
-
-    if (loop) {
-      input.tail_image_url = uploadedUrl
+      ...(loop ? { tail_image_url: uploadedUrl } : {}),
     }
 
     const result = await fal.subscribe('fal-ai/kling-video/v2.5-turbo/pro/image-to-video', {

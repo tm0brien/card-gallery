@@ -1,27 +1,25 @@
 import dynamic from 'next/dynamic'
 import Head from 'next/head'
-import { useEffect, useState } from 'react'
+import type { GetStaticProps } from 'next'
 
-import { useTheme } from '../context/ThemeContext'
-import type { CardManifest, CardSummary } from '../types/card'
+import { getCards } from '../lib/cards'
+import type { CardSummary } from '../types/card'
 
-const CollectionRoot = dynamic(() => import('../components/CollectionRoot'), { ssr: false })
+const Vault = dynamic(() => import('../components/Vault'), { ssr: false })
 
-export default function Gallery() {
-    const [cards, setCards] = useState<CardSummary[]>([])
-    const [loading, setLoading] = useState(true)
-    const { themeMode } = useTheme()
+interface GalleryProps {
+    cards: CardSummary[]
+}
 
-    useEffect(() => {
-        fetch('/api/cards')
-            .then((res) => res.json())
-            .then((manifest: CardManifest) => {
-                setCards(manifest.cards)
-                setLoading(false)
-            })
-            .catch(() => setLoading(false))
-    }, [])
+export const getStaticProps: GetStaticProps<GalleryProps> = async () => {
+    const manifest = await getCards()
+    return {
+        props: { cards: manifest.cards },
+        revalidate: 60,
+    }
+}
 
+export default function Gallery({ cards }: GalleryProps) {
     return (
         <>
             <Head>
@@ -30,59 +28,7 @@ export default function Gallery() {
                 <link rel="icon" href="/favicon.ico" />
             </Head>
 
-            <div data-theme={themeMode}>
-                {loading && (
-                    <div className="viewer-container collection-viewer">
-                        <div className="background-gradient" />
-                        <div className="texture-overlay" />
-                        <div className="vignette-overlay" />
-                        <div className="film-grain" />
-                        <div
-                            style={{
-                                position: 'fixed',
-                                inset: 0,
-                                display: 'grid',
-                                placeItems: 'center',
-                                zIndex: 10,
-                                color: 'var(--panel-text-secondary)',
-                                fontFamily: 'var(--font-sans)',
-                                fontSize: '12px',
-                                letterSpacing: '0.08em',
-                                textTransform: 'uppercase',
-                            }}
-                        >
-                            Loading collection…
-                        </div>
-                    </div>
-                )}
-
-                {!loading && cards.length === 0 && (
-                    <div className="viewer-container collection-viewer">
-                        <div className="background-gradient" />
-                        <div className="texture-overlay" />
-                        <div className="vignette-overlay" />
-                        <div className="film-grain" />
-                        <div
-                            style={{
-                                position: 'fixed',
-                                inset: 0,
-                                display: 'grid',
-                                placeItems: 'center',
-                                zIndex: 10,
-                                color: 'var(--panel-text-secondary)',
-                                fontFamily: 'var(--font-sans)',
-                                fontSize: '12px',
-                                letterSpacing: '0.08em',
-                                textTransform: 'uppercase',
-                            }}
-                        >
-                            No cards found
-                        </div>
-                    </div>
-                )}
-
-                {!loading && cards.length > 0 && <CollectionRoot cards={cards} />}
-            </div>
+            {cards.length > 0 && <Vault cards={cards} />}
         </>
     )
 }

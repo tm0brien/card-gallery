@@ -1,0 +1,324 @@
+/* DebugPanel — floating tuning panel */
+
+.toggle {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 9999;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(10, 10, 10, 0.7);
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 14px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    line-height: 1;
+    padding: 0;
+}
+.toggle:hover {
+    background: rgba(30, 30, 30, 0.85);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Panel shell ── */
+
+.panel {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 9999;
+    width: 340px;
+    max-height: calc(100vh - 24px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(12, 12, 14, 0.9);
+    color: #e8e8e8;
+    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+    font-size: 11px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+}
+
+.headerTitle {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.actionBtn {
+    padding: 3px 9px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.65);
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.actionBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+}
+.actionBtnSuccess {
+    background: rgba(72, 199, 142, 0.2) !important;
+    border-color: rgba(72, 199, 142, 0.4) !important;
+    color: #48c78e !important;
+}
+
+.closeBtn {
+    padding: 2px 6px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.12s;
+    line-height: 1;
+}
+.closeBtn:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.body {
+    overflow-y: auto;
+    padding: 8px 14px 14px;
+    flex: 1;
+}
+
+.body::-webkit-scrollbar { width: 4px; }
+.body::-webkit-scrollbar-track { background: transparent; }
+.body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+}
+
+/* ── Section header ── */
+
+.section {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.28);
+    padding: 12px 0 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 8px;
+}
+
+/* ── Generic slider row ── */
+
+.sliderRow {
+    display: grid;
+    grid-template-columns: 124px 1fr 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+.sliderLabel {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sliderInput {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.15);
+    outline: none;
+    cursor: pointer;
+}
+.sliderInput::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    transition: transform 0.1s;
+}
+.sliderInput::-webkit-slider-thumb:hover { transform: scale(1.3); }
+.sliderInput::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.sliderInput:active::-webkit-slider-thumb { transform: scale(1.4); }
+
+.sliderValue {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 10px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Lighting rig diagram ── */
+
+.lightRig {
+    display: block;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+/* ── Per-light row ── */
+
+.lightRow {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 0 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 6px;
+}
+.lightRow:last-of-type {
+    border-bottom: none;
+}
+
+.lightLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.lightDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.lightAngles {
+    font-weight: 400;
+    font-size: 9px;
+    letter-spacing: 0;
+    color: rgba(255, 255, 255, 0.22);
+    font-variant-numeric: tabular-nums;
+}
+
+.lightKelvin {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
+    transition: color 0.1s;
+}
+
+.lightBody {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.lightPad {
+    display: block;
+    border-radius: 5px;
+    flex-shrink: 0;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.lightRight {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+/* Inside lightRight, sliderRow gets 3-col layout but needs to fit the narrower space */
+.lightRight .sliderRow {
+    grid-template-columns: 58px 1fr 36px;
+    gap: 6px;
+}
+
+/* ── Temperature strip ── */
+
+.tempStrip {
+    height: 13px;
+    border-radius: 4px;
+    position: relative;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.tempTick {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 1px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Footer ── */
+
+.footer {
+    padding: 8px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.2);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.footer kbd {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+    font-family: inherit;
+    font-size: 10px;
+}
