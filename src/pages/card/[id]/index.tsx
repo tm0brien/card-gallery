@@ -4,6 +4,7 @@ import Head from 'next/head'
 import type { GetServerSideProps } from 'next'
 
 import { getCards } from '../../../lib/cards'
+import { filterViewableCards } from '../../../lib/viewableCards'
 import type { CardSummary } from '../../../types/card'
 
 const Vault = dynamic(() => import('../../../components/Vault'), { ssr: false })
@@ -31,10 +32,11 @@ export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
 ) => {
     const id = ctx.params?.id as string
     const manifest = await getCards()
-    const card = manifest.cards.find((c) => c.id === id)
+    const cards = filterViewableCards(manifest.cards)
+    const card = cards.find((c) => c.id === id)
 
     if (!card) {
-        return { redirect: { destination: '/', permanent: false } }
+        return { notFound: true }
     }
 
     const protocol =
@@ -45,7 +47,7 @@ export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
     return {
         props: {
             card,
-            cards: manifest.cards,
+            cards,
             baseUrl,
             ogDescription: buildDescription(card),
         },

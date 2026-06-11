@@ -11,11 +11,15 @@ import * as THREE from 'three'
 import { Group } from 'three'
 
 import { ThemeConfig } from '../config/theme'
+import { getCardDimensions } from '../lib/cardDimensions'
+import type { CardOrientation } from '../lib/cardOrientation'
+import { getSlabTextureUrls } from '../lib/cardAssets'
 import { createRoundedBoxGeometry } from '../lib/roundedBoxGeometry'
 
 interface CardSlabProps {
     assetPath: string
     hasAssets?: boolean
+    orientation?: CardOrientation
     isIdle?: boolean
     theme: ThemeConfig
     videoTexture?: THREE.Texture | null
@@ -33,26 +37,20 @@ const PLACEHOLDER_EDGE = '#bcb4a7'
 const PLACEHOLDER_INSERT = '#efe5d2'
 
 function TexturedSlab({
-    assetPath,
+    cardId,
     geometry,
     materialConfig,
     videoTexture,
     registerMaterial,
 }: {
-    assetPath: string
+    cardId: string
     geometry: THREE.BufferGeometry
     materialConfig: ThemeConfig['material']
     videoTexture?: THREE.Texture | null
     registerMaterial: (material: THREE.Material | null) => void
 }) {
-    const textures = useTexture({
-        front: `${assetPath}/front.png`,
-        back: `${assetPath}/back.png`,
-        left: `${assetPath}/left.png`,
-        right: `${assetPath}/right.png`,
-        top: `${assetPath}/top.png`,
-        bottom: `${assetPath}/bottom.png`
-    })
+    const textureUrls = useMemo(() => getSlabTextureUrls(cardId), [cardId])
+    const textures = useTexture(textureUrls)
 
     useMemo(() => {
         Object.values(textures).forEach(texture => {
@@ -60,6 +58,7 @@ function TexturedSlab({
             texture.generateMipmaps = true
             texture.minFilter = THREE.LinearMipmapLinearFilter
             texture.magFilter = THREE.LinearFilter
+            texture.anisotropy = 8
         })
     }, [textures])
 
@@ -225,6 +224,7 @@ function PlaceholderSlab({
 const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
     assetPath,
     hasAssets = true,
+    orientation = 'portrait',
     isIdle = false,
     theme,
     videoTexture,
@@ -248,12 +248,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
         group: groupRef.current
     }))
 
-    // Slab dimensions (scaled down from pixel measurements)
-    const roughDimensions = [6100, 3800, 400]
-    const scale = 1600
-    const width = roughDimensions[0] / scale
-    const height = roughDimensions[1] / scale
-    const depth = roughDimensions[2] / scale
+    const { width, height, depth } = getCardDimensions(orientation)
 
     const geometry = useMemo(
         () => createRoundedBoxGeometry(width, height, depth, 0.025),
@@ -288,7 +283,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
         <group ref={groupRef}>
             {hasAssets ? (
                 <TexturedSlab
-                    assetPath={assetPath}
+                    cardId={assetPath.replace(/^\/assets\//, '')}
                     geometry={geometry}
                     materialConfig={materialConfig}
                     videoTexture={videoTexture}

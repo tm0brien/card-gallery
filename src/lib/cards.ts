@@ -12,6 +12,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { CardManifest } from '@/types/card'
+import { detectFrontOrientation } from '@/lib/detectOrientation'
 import { parseSheetCSV } from '@/lib/parseCards'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID
@@ -33,19 +34,12 @@ function hasAssets(id: string): boolean {
   )
 }
 
-function detectOrientation(id: string): 'portrait' | 'landscape' | undefined {
-  const frontPath = path.join(ASSETS_DIR, id, 'front.png')
-  if (!fs.existsSync(frontPath)) return undefined
-  try {
-    const buf = Buffer.alloc(24)
-    const fd = fs.openSync(frontPath, 'r')
-    fs.readSync(fd, buf, 0, 24, 0)
-    fs.closeSync(fd)
-    const width = buf.readUInt32BE(16)
-    const height = buf.readUInt32BE(20)
-    return width > height ? 'landscape' : 'portrait'
-  } catch {
-    return undefined
+function applyOrientationFromAssets(cards: CardManifest['cards']): void {
+  for (const card of cards) {
+    const orientation = detectFrontOrientation(ASSETS_DIR, card.id)
+    if (orientation) {
+      card.orientation = orientation
+    }
   }
 }
 
@@ -80,12 +74,7 @@ async function getCardsUncached(): Promise<CardManifest> {
       if (res.ok) {
         const csvText = await res.text()
         const cards = parseSheetCSV(csvText, hasAssets)
-        for (const card of cards) {
-          const orientation = detectOrientation(card.id)
-          if (orientation && orientation !== 'portrait') {
-            card.orientation = orientation
-          }
-        }
+        applyOrientationFromAssets(cards)
         const manifest: CardManifest = {
           version: 1,
           lastSynced: new Date().toISOString(),

@@ -1,9 +1,8 @@
-import { Environment, Lightformer, OrbitControls } from '@react-three/drei'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei'
+import { Canvas, useThree } from '@react-three/fiber'
 import {
     Bloom,
     ChromaticAberration,
-    DepthOfField,
     EffectComposer,
     HueSaturation,
     Noise,
@@ -13,6 +12,7 @@ import { BlendFunction } from 'postprocessing'
 import {
     Suspense,
     memo,
+    startTransition,
     useCallback,
     useEffect,
     useMemo,
@@ -21,15 +21,16 @@ import {
 } from 'react'
 import * as THREE from 'three'
 
-import { type AtmosphereConfig, type MaterialConfig, type MotionConfig, type ThemeConfig } from '../config/theme'
+import { type AtmosphereConfig, type ThemeConfig } from '../config/theme'
 import { useTheme } from '../context/ThemeContext'
 import { useCompositedVideoTexture } from '../hooks/useCompositedVideoTexture'
-import {
-    calculateFitDistance,
-    SLAB_HEIGHT,
-    SLAB_WIDTH,
-} from '../lib/transition/viewerPose'
+import { getCardDimensions } from '../lib/cardDimensions'
+import type { CardOrientation } from '../lib/cardOrientation'
+import { calculateFitDistance } from '../lib/transition/viewerPose'
+import { preloadAdjacentCardAssets } from '../lib/transition/assetPreloader'
+import { InvalidateRegistrar } from '../lib/invalidateCanvas'
 import type { CardData, CardSummary } from '../types/card'
+import CardRuler from './CardRuler'
 import CardSlab from './CardSlab'
 import DebugPanel, { kelvinToHex, sphericalToXyz, type DebugOverrides } from './DebugPanel'
 import InfoPanel from './InfoPanel'
@@ -39,169 +40,63 @@ import ThemeSwitcher from './ThemeSwitcher'
 import styles from '../styles/Vault.module.css'
 
 // ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type VaultPhase = 'browsing' | 'focusing' | 'inspecting' | 'returning'
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const BROWSE_FOV = 36
 const INSPECT_FOV = 38
 
-// ---------------------------------------------------------------------------
-// Easing from cubic-bezier control points (Newton's method approximation)
-// ---------------------------------------------------------------------------
-
-function cubicBezierEasing(p1x: number, p1y: number, p2x: number, p2y: number) {
-    return function ease(t: number): number {
-        const cx = 3 * p1x
-        const bx = 3 * (p2x - p1x) - cx
-        const ax = 1 - cx - bx
-        const cy = 3 * p1y
-        const by = 3 * (p2y - p1y) - cy
-        const ay = 1 - cy - by
-
-        let x = t
-        for (let i = 0; i < 8; i++) {
-            const xEst = ((ax * x + bx) * x + cx) * x - t
-            if (Math.abs(xEst) < 1e-6) break
-            const dxEst = (3 * ax * x + 2 * bx) * x + cx
-            if (Math.abs(dxEst) < 1e-6) break
-            x -= xEst / dxEst
-        }
-        return ((ay * x + by) * x + cy) * x
-    }
+function setInspectCameraPose(
+    camera: THREE.Camera,
+    size: { width: number; height: number },
+    orientation: CardOrientation,
+) {
+    const { width, height } = getCardDimensions(orientation)
+    const aspect = size.width / size.height
+    const distance = calculateFitDistance(width, height, INSPECT_FOV, aspect, 1.25)
+    const azimuth = -Math.PI * 0.1
+    const elevation = Math.PI * 0.015
+    const x = distance * 1.35 * Math.sin(azimuth) * Math.cos(elevation)
+    const y = distance * 1.35 * Math.sin(elevation)
+    const z = distance * 1.35 * Math.cos(azimuth) * Math.cos(elevation)
+    camera.position.set(x, y, z)
+    const cam = camera as THREE.PerspectiveCamera
+    cam.fov = INSPECT_FOV
+    cam.updateProjectionMatrix()
+    camera.lookAt(0, 0, 0)
 }
 
 // ---------------------------------------------------------------------------
-// BrowseCamera — sets presentation camera pose in browse (tilt comes from VaultScene → HeroCard)
+// OrbitCamera — always-on inspect orbit controls
 // ---------------------------------------------------------------------------
 
-function BrowseCamera({ motion, phase }: { motion: MotionConfig; phase: VaultPhase }) {
-    const { camera, size } = useThree()
-
-    useEffect(() => {
-        if (phase !== 'browsing') return
-        const aspect = size.width / size.height
-        const distance = calculateFitDistance(SLAB_WIDTH, SLAB_HEIGHT, BROWSE_FOV, aspect, 1.35)
-        const tiltRad = (motion.presentationTilt * Math.PI) / 180
-        camera.position.set(0, distance * Math.sin(tiltRad), distance * Math.cos(tiltRad))
-        ;(camera as THREE.PerspectiveCamera).fov = BROWSE_FOV
-        ;(camera as THREE.PerspectiveCamera).updateProjectionMatrix()
-        camera.lookAt(0, 0, 0)
-    }, [phase, camera, size, motion.presentationTilt])
-
-    return null
-}
-
-// ---------------------------------------------------------------------------
-// InspectCamera — orbit controls enabled only during inspect
-// ---------------------------------------------------------------------------
-
-function InspectCamera({
-    phase,
+function OrbitCamera({
     theme,
+    orientation,
 }: {
-    phase: VaultPhase
     theme: ThemeConfig
+    orientation: CardOrientation
 }) {
     const controlsRef = useRef<any>(null)
-    const { camera, size } = useThree()
-    const animRef = useRef<{
-        startPos: THREE.Vector3
-        targetPos: THREE.Vector3
-        startTarget: THREE.Vector3
-        targetTarget: THREE.Vector3
-        startFov: number
-        targetFov: number
-        progress: number
-        easing: (t: number) => number
-        duration: number
-    } | null>(null)
+    const { camera, size, invalidate } = useThree()
 
+    // Refit whenever the viewport or the card's orientation changes, so
+    // portrait/landscape swaps and window resizes keep consistent framing.
     useEffect(() => {
-        if (phase === 'focusing') {
-            const aspect = size.width / size.height
-            const distance = calculateFitDistance(SLAB_WIDTH, SLAB_HEIGHT, INSPECT_FOV, aspect, 1.25)
-            const azimuth = -Math.PI * 0.1
-            const elevation = Math.PI * 0.015
-            const x = distance * 1.35 * Math.sin(azimuth) * Math.cos(elevation)
-            const y = distance * 1.35 * Math.sin(elevation)
-            const z = distance * 1.35 * Math.cos(azimuth) * Math.cos(elevation)
-            const [e0, e1, e2, e3] = theme.motion.focusEasing
-            animRef.current = {
-                startPos: camera.position.clone(),
-                targetPos: new THREE.Vector3(x, y, z),
-                startTarget: new THREE.Vector3(0, 0, 0),
-                targetTarget: new THREE.Vector3(0, 0, 0),
-                startFov: (camera as THREE.PerspectiveCamera).fov,
-                targetFov: INSPECT_FOV,
-                progress: 0,
-                easing: cubicBezierEasing(e0, e1, e2, e3),
-                duration: theme.motion.focusDuration,
-            }
-        } else if (phase === 'returning') {
-            const aspect = size.width / size.height
-            const distance = calculateFitDistance(SLAB_WIDTH, SLAB_HEIGHT, BROWSE_FOV, aspect, 1.35)
-            const tiltRad = (theme.motion.presentationTilt * Math.PI) / 180
-            const [e0, e1, e2, e3] = theme.motion.focusEasing
-            const target = controlsRef.current?.target?.clone() ?? new THREE.Vector3(0, 0, 0)
-            animRef.current = {
-                startPos: camera.position.clone(),
-                targetPos: new THREE.Vector3(0, distance * Math.sin(tiltRad), distance * Math.cos(tiltRad)),
-                startTarget: target,
-                targetTarget: new THREE.Vector3(0, 0, 0),
-                startFov: (camera as THREE.PerspectiveCamera).fov,
-                targetFov: BROWSE_FOV,
-                progress: 0,
-                easing: cubicBezierEasing(e0, e1, e2, e3),
-                duration: theme.motion.focusDuration * 0.8,
-            }
-        }
-    }, [phase, camera, size, theme.motion])
-
-    useFrame((_, delta) => {
-        const anim = animRef.current
-        if (!anim) return
-        if (phase !== 'focusing' && phase !== 'returning') {
-            animRef.current = null
-            return
-        }
-
-        anim.progress = Math.min(anim.progress + (delta * 1000) / anim.duration, 1)
-        const t = anim.easing(anim.progress)
-
-        camera.position.lerpVectors(anim.startPos, anim.targetPos, t)
-        const cam = camera as THREE.PerspectiveCamera
-        cam.fov = THREE.MathUtils.lerp(anim.startFov, anim.targetFov, t)
-        cam.updateProjectionMatrix()
-
+        setInspectCameraPose(camera, size, orientation)
         if (controlsRef.current?.target) {
-            controlsRef.current.target.lerpVectors(anim.startTarget, anim.targetTarget, t)
+            controlsRef.current.target.set(0, 0, 0)
+            controlsRef.current.update()
         }
+        invalidate()
+    }, [camera, size, invalidate, orientation])
 
-        camera.lookAt(
-            THREE.MathUtils.lerp(anim.startTarget.x, anim.targetTarget.x, t),
-            THREE.MathUtils.lerp(anim.startTarget.y, anim.targetTarget.y, t),
-            THREE.MathUtils.lerp(anim.startTarget.z, anim.targetTarget.z, t),
-        )
-
-        if (anim.progress >= 1) {
-            animRef.current = null
-        }
-    })
-
-    const enabled = phase === 'inspecting'
     const cam = theme.camera
 
     return (
         <OrbitControls
             ref={controlsRef}
-            enabled={enabled}
-            enablePan={true}
+            enabled
+            enablePan
             minDistance={0.5}
             maxDistance={16}
             enableDamping={cam.enableDamping}
@@ -211,34 +106,24 @@ function InspectCamera({
             panSpeed={cam.panSpeed}
             minPolarAngle={cam.minPolarAngle}
             maxPolarAngle={cam.maxPolarAngle}
+            onChange={() => invalidate()}
         />
     )
 }
 
 // ---------------------------------------------------------------------------
-// HeroCard — the single card in view, with idle tilt + cursor response
+// DisplayCard — card in the viewer
 // ---------------------------------------------------------------------------
 
-const HeroCard = memo(function HeroCard({
+const DisplayCard = memo(function DisplayCard({
     card,
     theme,
-    motion,
-    phase,
-    cursorTilt,
     activeVideoUrl,
 }: {
     card: CardSummary
     theme: ThemeConfig
-    motion: MotionConfig
-    phase: VaultPhase
-    cursorTilt: React.MutableRefObject<{ x: number; y: number }>
     activeVideoUrl: string | null
 }) {
-    const groupRef = useRef<THREE.Group>(null)
-    const tiltX = useRef(0)
-    const tiltY = useRef(0)
-    const idleTime = useRef(0)
-
     const assetPath = `/assets/${card.id}`
     const videoTexture = useCompositedVideoTexture(
         card.hasAssets ? activeVideoUrl : null,
@@ -246,102 +131,15 @@ const HeroCard = memo(function HeroCard({
         `${assetPath}/mask.png`,
     )
 
-    useFrame((_, delta) => {
-        if (!groupRef.current) return
-        const isBrowsing = phase === 'browsing'
-
-        if (isBrowsing) {
-            idleTime.current += delta
-
-            const idleAmp = (motion.idleTiltAmplitude * Math.PI) / 180
-            const idleX = Math.sin(idleTime.current * motion.idleTiltSpeed * 0.7) * idleAmp * 0.3
-            const idleY = Math.sin(idleTime.current * motion.idleTiltSpeed) * idleAmp
-
-            const targetX = cursorTilt.current.x + idleX
-            const targetY = cursorTilt.current.y + idleY
-
-            tiltX.current += (targetX - tiltX.current) * 0.06
-            tiltY.current += (targetY - tiltY.current) * 0.06
-
-            groupRef.current.rotation.x = tiltX.current
-            groupRef.current.rotation.y = tiltY.current
-        }
-    })
-
     return (
-        <group ref={groupRef}>
-            <CardSlab
-                assetPath={assetPath}
-                hasAssets={card.hasAssets}
-                isIdle={false}
-                theme={theme}
-                videoTexture={videoTexture}
-            />
-        </group>
-    )
-})
-
-// ---------------------------------------------------------------------------
-// TransitionCard — animates in/out during scroll
-// ---------------------------------------------------------------------------
-
-const TransitionCard = memo(function TransitionCard({
-    card,
-    theme,
-    direction,
-    scrollDir,
-    progress,
-    motion,
-}: {
-    card: CardSummary
-    theme: ThemeConfig
-    direction: 'enter' | 'exit'
-    scrollDir: 'next' | 'prev'
-    progress: number
-    motion: MotionConfig
-}) {
-    const groupRef = useRef<THREE.Group>(null)
-    const opacityRef = useRef(direction === 'enter' ? 0 : 1)
-    const progressRef = useRef(progress)
-    progressRef.current = progress
-    const assetPath = `/assets/${card.id}`
-
-    // Flip the spatial direction when scrolling backward so motion matches gesture
-    const flip = scrollDir === 'prev' ? -1 : 1
-
-    useFrame(() => {
-        if (!groupRef.current) return
-        const t = progressRef.current
-        const offset = direction === 'enter' ? motion.cardEntryOffset : motion.cardExitOffset
-        const rot = direction === 'enter' ? motion.cardEntryRotation : motion.cardExitRotation
-
-        // entering: starts at offset, moves to 0. exiting: starts at 0, moves to offset.
-        const invT = direction === 'enter' ? 1 - t : t
-
-        groupRef.current.position.set(
-            offset[0] * invT * flip,
-            offset[1] * invT * flip,
-            offset[2] * invT,
-        )
-        groupRef.current.rotation.set(
-            rot[0] * invT * flip,
-            rot[1] * invT * flip,
-            rot[2] * invT,
-        )
-
-        opacityRef.current = direction === 'enter' ? t : 1 - t
-    })
-
-    return (
-        <group ref={groupRef}>
-            <CardSlab
-                assetPath={assetPath}
-                hasAssets={card.hasAssets}
-                isIdle={false}
-                theme={theme}
-                opacityRef={opacityRef}
-            />
-        </group>
+        <CardSlab
+            assetPath={assetPath}
+            hasAssets={card.hasAssets}
+            orientation={card.orientation ?? 'portrait'}
+            isIdle={false}
+            theme={theme}
+            videoTexture={videoTexture}
+        />
     )
 })
 
@@ -351,15 +149,6 @@ const TransitionCard = memo(function TransitionCard({
 
 const StudioLighting = memo(function StudioLighting({ theme }: { theme: ThemeConfig }) {
     const { lighting } = theme
-    const keyRef = useRef<THREE.DirectionalLight>(null)
-
-    useFrame((state) => {
-        if (keyRef.current && theme.name === 'study') {
-            const t = state.clock.elapsedTime
-            const flicker = Math.sin(t * 0.3) * 0.015 + Math.sin(t * 0.7) * 0.008
-            keyRef.current.intensity = lighting.keyIntensity + flicker
-        }
-    })
 
     return (
         <>
@@ -373,7 +162,6 @@ const StudioLighting = memo(function StudioLighting({ theme }: { theme: ThemeCon
                 />
             )}
             <directionalLight
-                ref={keyRef}
                 position={lighting.keyPosition}
                 intensity={lighting.keyIntensity}
                 color={lighting.keyColor}
@@ -407,7 +195,6 @@ const StudioEnvironment = memo(function StudioEnvironment({
         return <Environment preset={atmosphere.envPreset as any} environmentIntensity={atmosphere.envIntensity} />
     }
 
-    // Warm vs. cool softbox colors based on theme
     const isWarm = theme.name === 'study'
     const isCool = theme.name === 'night'
     const topColor = isWarm ? '#ffe4b5' : isCool ? '#b0c4de' : '#ffffff'
@@ -416,7 +203,6 @@ const StudioEnvironment = memo(function StudioEnvironment({
 
     return (
         <Environment resolution={256} environmentIntensity={atmosphere.envIntensity}>
-            {/* Primary softbox — wide, above and slightly in front */}
             <Lightformer
                 intensity={atmosphere.lightformerTopIntensity}
                 form="rect"
@@ -425,7 +211,6 @@ const StudioEnvironment = memo(function StudioEnvironment({
                 scale={[8, 2, 1]}
                 target={[0, 0, 0]}
             />
-            {/* Rim/edge catch — narrow strip from upper back-right */}
             <Lightformer
                 intensity={atmosphere.lightformerRimIntensity}
                 form="rect"
@@ -434,7 +219,6 @@ const StudioEnvironment = memo(function StudioEnvironment({
                 scale={[1, 5, 1]}
                 target={[0, 0, 0]}
             />
-            {/* Fill — large soft panel from lower-left */}
             <Lightformer
                 intensity={atmosphere.lightformerFillIntensity}
                 form="rect"
@@ -453,34 +237,24 @@ const StudioEnvironment = memo(function StudioEnvironment({
 
 const PostProcessing = memo(function PostProcessing({
     atmosphere,
-    phase,
 }: {
     atmosphere: AtmosphereConfig
-    phase: VaultPhase
 }) {
-    const isBrowsing = phase === 'browsing' || phase === 'focusing' || phase === 'returning'
-    const isIdleInspect = phase === 'inspecting'
     const caOffset = useMemo(
         () => new THREE.Vector2(atmosphere.chromaticAberration, atmosphere.chromaticAberration * 0.5),
         [atmosphere.chromaticAberration],
     )
 
-    const bloomIntensity =
-        atmosphere.bloomEnabled && !isIdleInspect ? atmosphere.bloomStrength : 0
-    const grainOpacity = isIdleInspect ? atmosphere.grainIntensity * 0.35 : atmosphere.grainIntensity
+    const bloomIntensity = atmosphere.bloomEnabled ? atmosphere.bloomStrength : 0
+    const grainOpacity = atmosphere.grainIntensity * 0.35
 
     return (
-        <EffectComposer>
+        <EffectComposer multisampling={0}>
             <Bloom
                 intensity={bloomIntensity}
                 luminanceThreshold={atmosphere.bloomThreshold}
                 luminanceSmoothing={atmosphere.bloomRadius}
                 mipmapBlur
-            />
-            <DepthOfField
-                focusDistance={atmosphere.dofFocusDistance}
-                focalLength={atmosphere.dofFocalLength}
-                bokehScale={atmosphere.dofBrowseEnabled && isBrowsing ? atmosphere.dofBokehScale : 0}
             />
             <HueSaturation
                 blendFunction={BlendFunction.NORMAL}
@@ -509,12 +283,42 @@ const PostProcessing = memo(function PostProcessing({
 // ---------------------------------------------------------------------------
 
 function ToneMappingUpdater({ exposure }: { exposure: number }) {
-    const { gl } = useThree()
+    const { gl, invalidate } = useThree()
     useEffect(() => {
         gl.toneMappingExposure = exposure
-    }, [gl, exposure])
+        invalidate()
+    }, [gl, exposure, invalidate])
     return null
 }
+
+// ---------------------------------------------------------------------------
+// SlabShadow — soft contact shadow grounding the slab
+// ---------------------------------------------------------------------------
+
+const SlabShadow = memo(function SlabShadow({
+    theme,
+    orientation,
+}: {
+    theme: ThemeConfig
+    orientation: CardOrientation
+}) {
+    const { shadow } = theme
+    // Sit the shadow plane just below the slab's bottom edge.
+    const { height } = getCardDimensions(orientation)
+    const y = -(height / 2 + 0.12)
+    return (
+        <ContactShadows
+            position={[shadow.position[0], y, shadow.position[2]]}
+            opacity={shadow.opacity}
+            scale={shadow.scale}
+            blur={shadow.blur}
+            far={shadow.far}
+            color={shadow.color}
+            resolution={256}
+            frames={1}
+        />
+    )
+})
 
 // ---------------------------------------------------------------------------
 // VaultScene — the unified 3D scene
@@ -523,104 +327,46 @@ function ToneMappingUpdater({ exposure }: { exposure: number }) {
 function VaultScene({
     cards,
     currentIndex,
-    transitionState,
-    phase,
     theme,
     activeVideoUrl,
-    onCardClick,
 }: {
     cards: CardSummary[]
     currentIndex: number
-    transitionState: { index: number; progress: number; direction: 'next' | 'prev' } | null
-    phase: VaultPhase
     theme: ThemeConfig
     activeVideoUrl: string | null
-    onCardClick: () => void
 }) {
-    const { motion, atmosphere } = theme
-    const cursorTilt = useRef({ x: 0, y: 0 })
+    const { atmosphere } = theme
     const card = cards[currentIndex]
-
-    useEffect(() => {
-        if (phase !== 'browsing') return
-        const handler = (e: MouseEvent) => {
-            const strength = (motion.cursorTiltStrength * Math.PI) / 180
-            cursorTilt.current.x = -((e.clientY / window.innerHeight) * 2 - 1) * strength
-            cursorTilt.current.y = ((e.clientX / window.innerWidth) * 2 - 1) * strength
-        }
-        window.addEventListener('mousemove', handler)
-        return () => window.removeEventListener('mousemove', handler)
-    }, [phase, motion.cursorTiltStrength])
+    const orientation = card?.orientation ?? 'portrait'
 
     return (
         <>
             <StudioLighting theme={theme} />
             <StudioEnvironment atmosphere={atmosphere} theme={theme} />
+            <OrbitCamera theme={theme} orientation={orientation} />
 
-            <BrowseCamera motion={motion} phase={phase} />
-            <InspectCamera phase={phase} theme={theme} />
-
-            {card && !transitionState && (
-                <group
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        if (phase === 'browsing') onCardClick()
-                    }}
-                    onPointerOver={() => { document.body.style.cursor = phase === 'browsing' ? 'pointer' : 'default' }}
-                    onPointerOut={() => { document.body.style.cursor = 'default' }}
-                >
-                    <HeroCard
+            {card && (
+                // Suspense wraps only the card: while textures of a newly
+                // selected card load, the rest of the scene stays rendered and
+                // startTransition keeps the previous card on screen.
+                <Suspense fallback={null}>
+                    <DisplayCard
+                        key={card.id}
                         card={card}
                         theme={theme}
-                        motion={motion}
-                        phase={phase}
-                        cursorTilt={cursorTilt}
                         activeVideoUrl={activeVideoUrl}
                     />
-                </group>
+                    {/* Keyed so the one-frame shadow bake re-runs per card/theme */}
+                    <SlabShadow
+                        key={`shadow-${card.id}-${theme.name}`}
+                        theme={theme}
+                        orientation={orientation}
+                    />
+                </Suspense>
             )}
 
-            {transitionState && (
-                <>
-                    {/* Current card exits */}
-                    <TransitionCard
-                        card={card}
-                        theme={theme}
-                        direction="exit"
-                        scrollDir={transitionState.direction}
-                        progress={transitionState.progress}
-                        motion={motion}
-                    />
-                    {/* Next card enters */}
-                    <TransitionCard
-                        card={cards[transitionState.index]}
-                        theme={theme}
-                        direction="enter"
-                        scrollDir={transitionState.direction}
-                        progress={transitionState.progress}
-                        motion={motion}
-                    />
-                </>
-            )}
-
-            <PostProcessing atmosphere={atmosphere} phase={phase} />
+            <PostProcessing atmosphere={atmosphere} />
         </>
-    )
-}
-
-// ---------------------------------------------------------------------------
-// CardCounter — minimal position indicator
-// ---------------------------------------------------------------------------
-
-function CardCounter({ current, total, phase }: { current: number; total: number; phase: VaultPhase }) {
-    return (
-        <div
-            className={`${styles.counter} ${phase !== 'browsing' ? styles.counterHidden : ''}`}
-        >
-            <span className={styles.counterCurrent}>{current + 1}</span>
-            <span className={styles.counterSep}>/</span>
-            <span className={styles.counterTotal}>{total}</span>
-        </div>
     )
 }
 
@@ -682,8 +428,6 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
         }
     }, [theme, debugOverrides])
 
-    const { motion, atmosphere } = liveTheme
-
     const cards = initialCards
     const [currentIndex, setCurrentIndex] = useState(() => {
         if (initialCardId) {
@@ -692,235 +436,84 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
         }
         return 0
     })
-    const [phase, setPhase] = useState<VaultPhase>(() => (initialCardId ? 'inspecting' : 'browsing'))
-    const [transitionState, setTransitionState] = useState<{
-        index: number
-        progress: number
-        direction: 'next' | 'prev'
-    } | null>(null)
+    const invalidateRef = useRef<() => void>(() => {})
     const [cardData, setCardData] = useState<CardData | null>(null)
     const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null)
     const [showRemix, setShowRemix] = useState(false)
 
-    const scrollAccum = useRef(0)
-    const isTransitioning = useRef(false)
-    const scrubSnapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const scrubProgressRef = useRef(0)
-    const scrubDirRef = useRef<'next' | 'prev'>('next')
-    const scrubIndexRef = useRef(0)
-    const snapBackCancelledRef = useRef(false)
-    const phaseRef = useRef(phase)
-    phaseRef.current = phase
-
     const card = cards[currentIndex]
 
-    // Load card data when inspecting
     useEffect(() => {
-        if (phase !== 'inspecting' && phase !== 'focusing') {
-            setCardData(null)
-            return
-        }
+        preloadAdjacentCardAssets(cards, currentIndex)
+    }, [cards, currentIndex])
+
+    useEffect(() => {
+        // Clear immediately so the panel never shows the previous card's data.
+        setCardData(null)
         if (!card?.hasAssets) return
 
+        let cancelled = false
         fetch(`/assets/${card.id}/card-data.json`)
             .then((res) => res.json())
-            .then((data: CardData) => setCardData(data))
-            .catch(() => {})
-    }, [card, phase])
+            .then((data: CardData) => {
+                if (!cancelled) setCardData(data)
+            })
+            .catch(() => undefined)
 
-    // URL management via pushState
+        return () => {
+            cancelled = true
+        }
+    }, [card])
+
     useEffect(() => {
-        const path = phase === 'inspecting' || phase === 'focusing' ? `/card/${card?.id}` : '/'
+        if (!card) return
+        const path = `/card/${card.id}`
         if (window.location.pathname !== path) {
             window.history.pushState({}, '', path)
         }
-    }, [phase, card])
+    }, [card])
 
-    // Browser back button
     useEffect(() => {
-        const handler = () => {
-            if (phaseRef.current === 'inspecting') {
-                setPhase('returning')
-                setTimeout(() => setPhase('browsing'), theme.motion.focusDuration * 0.8)
+        const syncFromUrl = () => {
+            const match = window.location.pathname.match(/^\/card\/([^/]+)/)
+            if (!match) return
+            const idx = cards.findIndex((c) => c.id === match[1])
+            if (idx >= 0) {
+                startTransition(() => {
+                    setCurrentIndex(idx)
+                    setActiveVideoUrl(null)
+                })
+                invalidateRef.current()
             }
         }
-        window.addEventListener('popstate', handler)
-        return () => window.removeEventListener('popstate', handler)
-    }, [theme.motion.focusDuration])
+        window.addEventListener('popstate', syncFromUrl)
+        return () => window.removeEventListener('popstate', syncFromUrl)
+    }, [cards])
 
-    const handleCardClick = useCallback(() => {
-        if (phase !== 'browsing') return
-        setPhase('focusing')
-        setTimeout(() => setPhase('inspecting'), theme.motion.focusDuration)
-    }, [phase, theme.motion.focusDuration])
+    const goToCardIndex = useCallback((index: number) => {
+        if (index === currentIndex) return
+        if (index < 0 || index >= cards.length) return
 
-    const handleBack = useCallback(() => {
-        if (phase !== 'inspecting') return
-        setPhase('returning')
-        setActiveVideoUrl(null)
-        setShowRemix(false)
-        window.history.pushState({}, '', '/')
-        setTimeout(() => setPhase('browsing'), theme.motion.focusDuration * 0.8)
-    }, [phase, theme.motion.focusDuration])
+        // Transition keeps the current card rendered while the next card's
+        // textures load, instead of suspending to a blank canvas.
+        startTransition(() => {
+            setCurrentIndex(index)
+            setActiveVideoUrl(null)
+        })
+        invalidateRef.current()
+    }, [currentIndex, cards.length])
 
-    const snapBack = useCallback(() => {
-        if (isTransitioning.current) return
-
-        const progress = scrubProgressRef.current
-        if (progress <= 0) {
-            setTransitionState(null)
-            scrollAccum.current = 0
-            return
-        }
-
-        snapBackCancelledRef.current = false
-        const startProgress = progress
-        const startTime = performance.now()
-        const duration = startProgress * 280
-
-        const animate = () => {
-            if (isTransitioning.current || snapBackCancelledRef.current) return
-            const elapsed = performance.now() - startTime
-            const t = Math.min(elapsed / duration, 1)
-            const p = startProgress * (1 - t)
-            scrubProgressRef.current = p
-            setTransitionState({
-                index: scrubIndexRef.current,
-                progress: p,
-                direction: scrubDirRef.current,
-            })
-
-            if (t < 1) {
-                requestAnimationFrame(animate)
-            } else {
-                setTransitionState(null)
-                scrollAccum.current = 0
-                scrubProgressRef.current = 0
-            }
-        }
-        requestAnimationFrame(animate)
-    }, [])
-
-    const triggerCardTransition = useCallback((dir: 1 | -1, startProgress = 0) => {
-        if (isTransitioning.current) return
-        const nextIndex = currentIndex + dir
-        if (nextIndex < 0 || nextIndex >= cards.length) return
-
-        isTransitioning.current = true
-        snapBackCancelledRef.current = true
-        scrollAccum.current = 0
-
-        const [e0, e1, e2, e3] = motion.cardTransitionEasing
-        const easing = cubicBezierEasing(e0, e1, e2, e3)
-        const startTime = performance.now()
-        const remaining = Math.max(0.05, 1 - startProgress)
-        const duration = motion.cardTransitionDuration * remaining
-        const direction = dir > 0 ? 'next' : 'prev'
-
-        const animate = () => {
-            const elapsed = performance.now() - startTime
-            const raw = Math.min(elapsed / duration, 1)
-            const t = startProgress + remaining * easing(raw)
-
-            setTransitionState({ index: nextIndex, progress: t, direction })
-
-            if (raw < 1) {
-                requestAnimationFrame(animate)
-            } else {
-                setCurrentIndex(nextIndex)
-                setTransitionState(null)
-                isTransitioning.current = false
-                scrubProgressRef.current = 0
-            }
-        }
-
-        requestAnimationFrame(animate)
-    }, [currentIndex, cards.length, motion])
-
-    // Scroll handler
-    useEffect(() => {
-        if (phase !== 'browsing') return
-
-        const handler = (e: WheelEvent) => {
-            e.preventDefault()
-            if (isTransitioning.current) return
-
-            // Cancel any in-flight snap-back and clear the debounce timer
-            snapBackCancelledRef.current = true
-            if (scrubSnapTimerRef.current) {
-                clearTimeout(scrubSnapTimerRef.current)
-                scrubSnapTimerRef.current = null
-            }
-
-            const prevAccum = scrollAccum.current
-            scrollAccum.current += e.deltaY
-
-            const accum = scrollAccum.current
-            const dir = accum >= 0 ? 1 : -1
-            const prevDir = prevAccum > 0 ? 1 : prevAccum < 0 ? -1 : 0
-
-            // Reversed direction mid-scrub — snap back and restart
-            if (prevDir !== 0 && dir !== prevDir) {
-                scrollAccum.current = 0
-                snapBack()
-                return
-            }
-
-            const absAccum = Math.abs(accum)
-            const threshold = motion.scrollSensitivity
-            const nextIndex = currentIndex + dir
-            const direction: 'next' | 'prev' = dir > 0 ? 'next' : 'prev'
-
-            if (absAccum >= threshold) {
-                if (nextIndex >= 0 && nextIndex < cards.length) {
-                    triggerCardTransition(dir as 1 | -1, scrubProgressRef.current)
-                } else {
-                    scrollAccum.current = 0
-                    snapBack()
-                }
-            } else if (nextIndex >= 0 && nextIndex < cards.length) {
-                const scrubProgress = absAccum / threshold
-                scrubProgressRef.current = scrubProgress
-                scrubDirRef.current = direction
-                scrubIndexRef.current = nextIndex
-                setTransitionState({ index: nextIndex, progress: scrubProgress, direction })
-
-                // Snap back to rest if scrolling stops before threshold
-                scrubSnapTimerRef.current = setTimeout(snapBack, 150)
-            } else {
-                // At boundary — revert so card doesn't drift
-                scrollAccum.current = prevAccum
-            }
-        }
-
-        window.addEventListener('wheel', handler, { passive: false })
-        return () => {
-            window.removeEventListener('wheel', handler)
-            if (scrubSnapTimerRef.current) clearTimeout(scrubSnapTimerRef.current)
-        }
-    }, [phase, motion.scrollSensitivity, currentIndex, cards.length, triggerCardTransition, snapBack])
-
-    // Keyboard navigation
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if (phase === 'inspecting' && e.key === 'Escape') {
-                handleBack()
-                return
-            }
-
-            if (phase !== 'browsing' || isTransitioning.current) return
-
             if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-                triggerCardTransition(1)
+                goToCardIndex(Math.min(currentIndex + 1, cards.length - 1))
             } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                triggerCardTransition(-1)
-            } else if (e.key === 'Enter') {
-                handleCardClick()
+                goToCardIndex(Math.max(currentIndex - 1, 0))
             }
         }
         window.addEventListener('keydown', handler)
         return () => window.removeEventListener('keydown', handler)
-    }, [phase, triggerCardTransition, handleCardClick, handleBack])
+    }, [currentIndex, cards.length, goToCardIndex])
 
     const toneMapping = liveTheme.atmosphere.toneMapping === 'aces'
         ? THREE.ACESFilmicToneMapping
@@ -928,60 +521,38 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
             ? THREE.ReinhardToneMapping
             : THREE.NeutralToneMapping
 
-    const showInspectUi = phase === 'inspecting'
-    const showBrowseUi = phase === 'browsing'
-
     return (
         <div className={styles.vault} data-theme={themeMode}>
             <Canvas
                 className={styles.canvas}
+                frameloop="demand"
                 gl={{
                     antialias: true,
                     toneMapping,
                 }}
                 dpr={[1, 2]}
-                camera={{ fov: BROWSE_FOV, position: [0, 3, 8] }}
+                camera={{ fov: INSPECT_FOV, position: [0, 1, 6] }}
                 style={{ position: 'absolute', inset: 0 }}
             >
                 <Suspense fallback={null}>
+                    <InvalidateRegistrar invalidateRef={invalidateRef} />
                     <ToneMappingUpdater exposure={liveTheme.atmosphere.toneMappingExposure} />
                     <VaultScene
                         cards={cards}
                         currentIndex={currentIndex}
-                        transitionState={transitionState}
-                        phase={phase}
                         theme={liveTheme}
                         activeVideoUrl={activeVideoUrl}
-                        onCardClick={handleCardClick}
                     />
                 </Suspense>
             </Canvas>
 
-            {/* Browse UI */}
-            <div className={`${styles.browseUi} ${showBrowseUi ? '' : styles.uiHidden}`}>
-                <div className={styles.cardLabel}>
-                    {card && (
-                        <>
-                            <span className={styles.cardTitle}>{card.title}</span>
-                            <span className={styles.cardMeta}>
-                                {card.grade.company} {card.grade.score}
-                            </span>
-                        </>
-                    )}
-                </div>
-                <CardCounter current={currentIndex} total={cards.length} phase={phase} />
-                <div className={styles.scrollHint}>
-                    <span>Scroll to browse</span>
-                    <span className={styles.scrollHintDot}>·</span>
-                    <span>Click to inspect</span>
-                </div>
-            </div>
+            <CardRuler
+                cards={cards}
+                currentIndex={currentIndex}
+                onSelect={goToCardIndex}
+            />
 
-            {/* Inspect UI */}
-            <div className={`${styles.inspectUi} ${showInspectUi ? '' : styles.uiHidden}`}>
-                <button type="button" className={styles.backButton} onClick={handleBack}>
-                    ← Back
-                </button>
+            <div className={styles.inspectUi}>
                 {cardData && <InfoPanel cardData={cardData} />}
                 {card?.hasAssets && (
                     <RemixGallery
@@ -994,14 +565,12 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
                 )}
             </div>
 
-            {/* Theme switcher — always visible */}
             <ThemeSwitcher themeMode={themeMode} setThemeMode={setThemeMode} />
 
             {process.env.NODE_ENV !== 'production' && (
                 <DebugPanel theme={theme} onOverridesChange={setDebugOverrides} />
             )}
 
-            {/* Remix modal */}
             {showRemix && card?.hasAssets && (
                 <RemixModal
                     cardId={card.id}

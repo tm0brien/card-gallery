@@ -1,26 +1,9 @@
-const imageCache = new Map<string, Promise<void>>()
+import { useTexture } from '@react-three/drei'
+
+import { getSlabTextureUrls } from '../cardAssets'
+
+const preloadedSlabs = new Set<string>()
 const jsonCache = new Map<string, Promise<void>>()
-
-function preloadImage(url: string) {
-    if (imageCache.has(url)) return imageCache.get(url)!
-
-    const promise = new Promise<void>((resolve) => {
-        const image = new Image()
-        image.decoding = 'async'
-        image.onload = () => {
-            if (typeof image.decode === 'function') {
-                image.decode().catch(() => undefined).finally(() => resolve())
-                return
-            }
-            resolve()
-        }
-        image.onerror = () => resolve()
-        image.src = url
-    })
-
-    imageCache.set(url, promise)
-    return promise
-}
 
 function preloadJson(url: string) {
     if (jsonCache.has(url)) return jsonCache.get(url)!
@@ -33,19 +16,28 @@ function preloadJson(url: string) {
     return promise
 }
 
-export async function preloadCardAssets(cardId: string) {
-    const basePath = `/assets/${cardId}`
-    const imageUrls = [
-        `${basePath}/front.png`,
-        `${basePath}/back.png`,
-        `${basePath}/left.png`,
-        `${basePath}/right.png`,
-        `${basePath}/top.png`,
-        `${basePath}/bottom.png`,
-    ]
+/**
+ * Warms drei's useTexture suspense cache (fetch + decode) so CardSlab can
+ * mount without suspending. Must use the same URL set, in the same order, as
+ * CardSlab's useTexture call — the cache is keyed on the full URL list.
+ */
+export function preloadCardAssets(cardId: string) {
+    if (!preloadedSlabs.has(cardId)) {
+        preloadedSlabs.add(cardId)
+        useTexture.preload(Object.values(getSlabTextureUrls(cardId)))
+    }
+    void preloadJson(`/assets/${cardId}/card-data.json`)
+}
 
-    await Promise.all([
-        ...imageUrls.map((url) => preloadImage(url)),
-        preloadJson(`${basePath}/card-data.json`),
-    ])
+export function preloadAdjacentCardAssets(
+    cards: { id: string; hasAssets: boolean }[],
+    currentIndex: number
+) {
+    const indices = new Set([currentIndex, currentIndex - 1, currentIndex + 1])
+    for (const index of indices) {
+        const card = cards[index]
+        if (card?.hasAssets) {
+            preloadCardAssets(card.id)
+        }
+    }
 }

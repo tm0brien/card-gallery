@@ -73,11 +73,11 @@ export interface ShadowConfig {
 // Camera & Controls
 // ============================================
 export interface CameraConfig {
-    // OrbitControls - tuned for "reverent handling"
-    rotateSpeed: number // reduced for heavier feel
+    // OrbitControls - direct 1:1 pointer tracking
+    rotateSpeed: number
     zoomSpeed: number
     panSpeed: number
-    dampingFactor: number // increased for inertia
+    dampingFactor: number
     enableDamping: boolean
     // Polar angle limits - prevents awkward flips
     minPolarAngle: number // radians (prevent looking from below)
@@ -257,12 +257,11 @@ export const galleryTheme: ThemeConfig = {
         position: [0, -1.22, 0]
     },
     camera: {
-        // Professional, responsive controls
-        rotateSpeed: 0.7,
-        zoomSpeed: 0.9,
-        panSpeed: 0.7,
-        dampingFactor: 0.08,
-        enableDamping: true,
+        rotateSpeed: 1.8,
+        zoomSpeed: 1.0,
+        panSpeed: 0.9,
+        dampingFactor: 0,
+        enableDamping: false,
         minPolarAngle: Math.PI * 0.1, // ~18° from top
         maxPolarAngle: Math.PI * 0.85, // ~153° - no flip
         idleEnabled: true,
@@ -272,9 +271,9 @@ export const galleryTheme: ThemeConfig = {
     material: {
         roughness: 0.42,
         metalness: 0,
-        clearcoat: 0.18,
-        clearcoatRoughness: 0.45,
-        envMapIntensity: 0.12,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.3,
+        envMapIntensity: 0.16,
         normalScale: 0
     },
     ui: {
@@ -385,12 +384,11 @@ export const studyTheme: ThemeConfig = {
         position: [0, -1.18, 0]
     },
     camera: {
-        // Heavier, more deliberate - reverent handling
-        rotateSpeed: 0.5, // ~50% reduction
-        zoomSpeed: 0.7,
-        panSpeed: 0.5,
-        dampingFactor: 0.12, // More inertia
-        enableDamping: true,
+        rotateSpeed: 1.8,
+        zoomSpeed: 1.0,
+        panSpeed: 0.9,
+        dampingFactor: 0,
+        enableDamping: false,
         minPolarAngle: Math.PI * 0.12,
         maxPolarAngle: Math.PI * 0.88,
         idleEnabled: true,
@@ -513,12 +511,11 @@ export const nightTheme: ThemeConfig = {
         position: [0, -1.2, 0]
     },
     camera: {
-        // Slowest, most deliberate
-        rotateSpeed: 0.45,
-        zoomSpeed: 0.6,
-        panSpeed: 0.45,
-        dampingFactor: 0.14,
-        enableDamping: true,
+        rotateSpeed: 1.8,
+        zoomSpeed: 1.0,
+        panSpeed: 0.9,
+        dampingFactor: 0,
+        enableDamping: false,
         minPolarAngle: Math.PI * 0.15,
         maxPolarAngle: Math.PI * 0.85,
         idleEnabled: true,

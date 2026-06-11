@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "sync-cards": "tsx --env-file=.env.local scripts/sync-from-sheets.ts",
+    "normalize-scans": "tsx scripts/normalize-card-scans.ts",
+    "optimize-textures": "tsx scripts/optimize-textures.ts",
     "predev": "npm run sync-cards",
     "prebuild": "npm run sync-cards"
   },
@@ -17,30 +19,29 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
-    "@react-three/rapier": "^2.2.0",
-    "googleapis": "^171.4.0",
-    "next": "^16.1.6",
+    "next": "^16.2.7",
     "postprocessing": "^6.39.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "three": "^0.183.2"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.1.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.5.0",
-    "@types/react": "^19.2.14",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.183.1",
-    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
     "dotenv": "^17.3.1",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^16.2.7",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-prettier": "^5.5.6",
     "eslint-plugin-simple-import-sort": "^12.0.0",
-    "prettier": "^3.8.1",
+    "prettier": "^3.8.3",
     "prettier-eslint": "^16.4.2",
+    "sharp": "^0.34.5",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }

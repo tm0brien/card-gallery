@@ -20,6 +20,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
 import { parseSheetCSV } from '../src/lib/parseCards'
+import { detectFrontOrientation } from '../src/lib/detectOrientation'
 import type { CardManifest } from '../src/types/card'
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
@@ -35,23 +36,6 @@ function hasAssets(id: string): boolean {
     fs.existsSync(path.join(dir, 'front.png')) &&
     fs.existsSync(path.join(dir, 'back.png'))
   )
-}
-
-/** Read width/height from a PNG's IHDR chunk (bytes 16–23). */
-function detectOrientation(id: string): 'portrait' | 'landscape' | undefined {
-  const frontPath = path.join(ASSETS_DIR, id, 'front.png')
-  if (!fs.existsSync(frontPath)) return undefined
-  try {
-    const buf = Buffer.alloc(24)
-    const fd = fs.openSync(frontPath, 'r')
-    fs.readSync(fd, buf, 0, 24, 0)
-    fs.closeSync(fd)
-    const width = buf.readUInt32BE(16)
-    const height = buf.readUInt32BE(20)
-    return width > height ? 'landscape' : 'portrait'
-  } catch {
-    return undefined
-  }
 }
 
 function httpsGet(url: string): Promise<string> {
@@ -100,8 +84,8 @@ async function main() {
   const cards = parseSheetCSV(csvText, hasAssets)
 
   for (const card of cards) {
-    const orientation = detectOrientation(card.id)
-    if (orientation && orientation !== 'portrait') {
+    const orientation = detectFrontOrientation(ASSETS_DIR, card.id)
+    if (orientation) {
       card.orientation = orientation
     }
   }

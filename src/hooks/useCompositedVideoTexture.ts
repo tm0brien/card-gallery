@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 const MAX_TEXTURE_SIZE = 2048
@@ -22,6 +22,13 @@ export function useCompositedVideoTexture(
 ): THREE.CanvasTexture | null {
     const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null)
     const stateRef = useRef<CompositeState | null>(null)
+    const invalidate = useThree((state) => state.invalidate)
+
+    // Drive the demand-mode frameloop while a video is playing: rendering a
+    // frame here schedules the next one, kicked off by the effect below.
+    useEffect(() => {
+        if (texture) invalidate()
+    }, [texture, invalidate])
 
     useEffect(() => {
         if (!videoUrl) {
@@ -143,6 +150,7 @@ export function useCompositedVideoTexture(
     useFrame(() => {
         const s = stateRef.current
         if (!s) return
+        invalidate()
 
         const { canvas, tmpCanvas, texture: tex, video, frontImg, alphaMask, feather: f } = s
         if (video.paused || video.readyState < 2) return

@@ -38,9 +38,10 @@ export function createRoundedBoxGeometry(
     extruded.center()
     toCreasedNormals(extruded, creaseAngle)
 
-    // Non-indexed so each triangle owns its vertices — avoids UV conflicts at edges
-    const geom = extruded.toNonIndexed()
-    extruded.dispose()
+    // Non-indexed so each triangle owns its vertices — avoids UV conflicts at
+    // edges. ExtrudeGeometry is already non-indexed, so this usually no-ops.
+    const geom = extruded.index ? extruded.toNonIndexed() : extruded
+    if (geom !== extruded) extruded.dispose()
 
     const pos = geom.attributes.position as THREE.BufferAttribute
     const nrm = geom.attributes.normal as THREE.BufferAttribute

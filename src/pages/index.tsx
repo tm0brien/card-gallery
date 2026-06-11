@@ -3,6 +3,7 @@ import Head from 'next/head'
 import type { GetStaticProps } from 'next'
 
 import { getCards } from '../lib/cards'
+import { filterViewableCards } from '../lib/viewableCards'
 import type { CardSummary } from '../types/card'
 
 const Vault = dynamic(() => import('../components/Vault'), { ssr: false })
@@ -13,8 +14,19 @@ interface GalleryProps {
 
 export const getStaticProps: GetStaticProps<GalleryProps> = async () => {
     const manifest = await getCards()
+    const cards = filterViewableCards(manifest.cards)
+
+    if (cards.length > 0) {
+        return {
+            redirect: {
+                destination: `/card/${cards[0].id}`,
+                permanent: false,
+            },
+        }
+    }
+
     return {
-        props: { cards: manifest.cards },
+        props: { cards: [] },
         revalidate: 60,
     }
 }
