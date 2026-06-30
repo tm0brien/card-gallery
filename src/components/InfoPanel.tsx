@@ -29,7 +29,7 @@ export default function InfoPanel({ cardData }: InfoPanelProps) {
         startTime: 0,
         lastY: 0,
         isDragging: false,
-        didDrag: false,
+        didDrag: false
     })
 
     useEffect(() => {
@@ -64,7 +64,7 @@ export default function InfoPanel({ cardData }: InfoPanelProps) {
                 startTime: Date.now(),
                 lastY: touch.clientY,
                 isDragging: false,
-                didDrag: false,
+                didDrag: false
             }
         }
 
@@ -189,9 +189,7 @@ export default function InfoPanel({ cardData }: InfoPanelProps) {
                 {/* Provenance */}
                 <div className={styles.provenance}>
                     <span className={styles.metaLine}>{cardData.team}</span>
-                    {cardData.manufacturer && (
-                        <span className={styles.metaLine}>{cardData.manufacturer}</span>
-                    )}
+                    {cardData.manufacturer && <span className={styles.metaLine}>{cardData.manufacturer}</span>}
                     <span className={styles.metaLine}>Card no. {cardData.cardNumber}</span>
                 </div>
 
@@ -206,18 +204,10 @@ export default function InfoPanel({ cardData }: InfoPanelProps) {
                 {/* Subgrades (if present) */}
                 {cardData.grade.subgrades && (
                     <div className={styles.subgrades}>
-                        <span className={styles.subgradeItem}>
-                            Centering {cardData.grade.subgrades.centering}
-                        </span>
-                        <span className={styles.subgradeItem}>
-                            Corners {cardData.grade.subgrades.corners}
-                        </span>
-                        <span className={styles.subgradeItem}>
-                            Edges {cardData.grade.subgrades.edges}
-                        </span>
-                        <span className={styles.subgradeItem}>
-                            Surface {cardData.grade.subgrades.surface}
-                        </span>
+                        <span className={styles.subgradeItem}>Centering {cardData.grade.subgrades.centering}</span>
+                        <span className={styles.subgradeItem}>Corners {cardData.grade.subgrades.corners}</span>
+                        <span className={styles.subgradeItem}>Edges {cardData.grade.subgrades.edges}</span>
+                        <span className={styles.subgradeItem}>Surface {cardData.grade.subgrades.surface}</span>
                     </div>
                 )}
 

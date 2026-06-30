@@ -1,19 +1,13 @@
 import { useTexture } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import {
-    forwardRef,
-    type MutableRefObject,
-    useImperativeHandle,
-    useMemo,
-    useRef,
-} from 'react'
+import { forwardRef, type MutableRefObject, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { Group } from 'three'
 
 import { ThemeConfig } from '../config/theme'
+import { getSlabTextureUrls } from '../lib/cardAssets'
 import { getCardDimensions } from '../lib/cardDimensions'
 import type { CardOrientation } from '../lib/cardOrientation'
-import { getSlabTextureUrls } from '../lib/cardAssets'
 import { createRoundedBoxGeometry } from '../lib/roundedBoxGeometry'
 
 interface CardSlabProps {
@@ -38,13 +32,13 @@ const PLACEHOLDER_INSERT = '#efe5d2'
 
 function TexturedSlab({
     cardId,
-    geometry,
+    orientation,
     materialConfig,
     videoTexture,
-    registerMaterial,
+    registerMaterial
 }: {
     cardId: string
-    geometry: THREE.BufferGeometry
+    orientation: CardOrientation
     materialConfig: ThemeConfig['material']
     videoTexture?: THREE.Texture | null
     registerMaterial: (material: THREE.Material | null) => void
@@ -62,12 +56,58 @@ function TexturedSlab({
         })
     }, [textures])
 
+    // The edge scans always depict the physical portrait slab: `top` is the
+    // short BECKETT edge, `left`/`right` the long sides. Landscape cards sit in
+    // a slab rotated 90° clockwise (label on the right), so the scans must be
+    // remapped to different faces. The scans' long axes also differ from the
+    // faces' long UV axes, so each face needs its own rotation. Edge textures
+    // are shared via the loader cache across all slabs, so transforms are
+    // applied to per-slab clones instead of mutating the originals.
+    const faceTextures = useMemo(() => {
+        const cloneEdge = (texture: THREE.Texture, rotation: number) => {
+            const clone = texture.clone()
+            clone.center.set(0.5, 0.5)
+            clone.rotation = rotation
+            clone.needsUpdate = true
+            return clone
+        }
+        if (orientation === 'landscape') {
+            return {
+                right: cloneEdge(textures.top, Math.PI),
+                left: cloneEdge(textures.bottom, Math.PI),
+                top: cloneEdge(textures.left, 0),
+                bottom: cloneEdge(textures.right, 0)
+            }
+        }
+        return {
+            right: cloneEdge(textures.right, Math.PI / 2),
+            left: cloneEdge(textures.left, Math.PI / 2),
+            top: cloneEdge(textures.top, -Math.PI / 2),
+            bottom: cloneEdge(textures.bottom, -Math.PI / 2)
+        }
+    }, [textures, orientation])
+
+    useEffect(() => {
+        return () => {
+            Object.values(faceTextures).forEach(texture => texture.dispose())
+        }
+    }, [faceTextures])
+
+    // Keep the slab height constant and derive width from the scan's real
+    // pixel aspect ratio so the artwork is never stretched.
+    const geometry = useMemo(() => {
+        const { width, height, depth } = getCardDimensions(orientation)
+        const image = textures.front.image as { width?: number; height?: number } | undefined
+        const scanAspect = image?.width && image?.height ? image.width / image.height : width / height
+        return createRoundedBoxGeometry(height * scanAspect, height, depth, 0.025)
+    }, [textures.front, orientation])
+
     return (
         <mesh geometry={geometry}>
             <meshPhysicalMaterial
                 ref={registerMaterial}
                 attach="material-0"
-                map={textures.right}
+                map={faceTextures.right}
                 roughness={materialConfig.roughness}
                 metalness={materialConfig.metalness}
                 clearcoat={materialConfig.clearcoat}
@@ -77,7 +117,7 @@ function TexturedSlab({
             <meshPhysicalMaterial
                 ref={registerMaterial}
                 attach="material-1"
-                map={textures.left}
+                map={faceTextures.left}
                 roughness={materialConfig.roughness}
                 metalness={materialConfig.metalness}
                 clearcoat={materialConfig.clearcoat}
@@ -87,7 +127,7 @@ function TexturedSlab({
             <meshPhysicalMaterial
                 ref={registerMaterial}
                 attach="material-2"
-                map={textures.top}
+                map={faceTextures.top}
                 roughness={materialConfig.roughness}
                 metalness={materialConfig.metalness}
                 clearcoat={materialConfig.clearcoat}
@@ -97,7 +137,7 @@ function TexturedSlab({
             <meshPhysicalMaterial
                 ref={registerMaterial}
                 attach="material-3"
-                map={textures.bottom}
+                map={faceTextures.bottom}
                 roughness={materialConfig.roughness}
                 metalness={materialConfig.metalness}
                 clearcoat={materialConfig.clearcoat}
@@ -134,7 +174,7 @@ function PlaceholderSlab({
     materialConfig,
     width,
     height,
-    registerMaterial,
+    registerMaterial
 }: {
     depth: number
     geometry: THREE.BufferGeometry
@@ -210,27 +250,25 @@ function PlaceholderSlab({
 
             <mesh position={[0, 0, depth / 2 + 0.002]}>
                 <planeGeometry args={[width * 0.73, height * 0.78]} />
-                <meshBasicMaterial
-                    ref={registerMaterial}
-                    color={PLACEHOLDER_INSERT}
-                    transparent
-                    opacity={0.38}
-                />
+                <meshBasicMaterial ref={registerMaterial} color={PLACEHOLDER_INSERT} transparent opacity={0.38} />
             </mesh>
         </group>
     )
 }
 
-const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
-    assetPath,
-    hasAssets = true,
-    orientation = 'portrait',
-    isIdle = false,
-    theme,
-    videoTexture,
-    opacity = 1,
-    opacityRef,
-}, ref) {
+const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab(
+    {
+        assetPath,
+        hasAssets = true,
+        orientation = 'portrait',
+        isIdle = false,
+        theme,
+        videoTexture,
+        opacity = 1,
+        opacityRef
+    },
+    ref
+) {
     const groupRef = useRef<Group>(null)
     const materialConfig = theme.material
     const cameraConfig = theme.camera
@@ -250,9 +288,9 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
 
     const { width, height, depth } = getCardDimensions(orientation)
 
-    const geometry = useMemo(
-        () => createRoundedBoxGeometry(width, height, depth, 0.025),
-        [width, height, depth]
+    const placeholderGeometry = useMemo(
+        () => (hasAssets ? null : createRoundedBoxGeometry(width, height, depth, 0.025)),
+        [hasAssets, width, height, depth]
     )
 
     // Idle auto-rotation - slow museum turntable effect (1-2° drift)
@@ -284,7 +322,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
             {hasAssets ? (
                 <TexturedSlab
                     cardId={assetPath.replace(/^\/assets\//, '')}
-                    geometry={geometry}
+                    orientation={orientation}
                     materialConfig={materialConfig}
                     videoTexture={videoTexture}
                     registerMaterial={registerMaterial}
@@ -292,7 +330,7 @@ const CardSlab = forwardRef<CardSlabRef, CardSlabProps>(function CardSlab({
             ) : (
                 <PlaceholderSlab
                     depth={depth}
-                    geometry={geometry}
+                    geometry={placeholderGeometry!}
                     materialConfig={materialConfig}
                     width={width}
                     height={height}

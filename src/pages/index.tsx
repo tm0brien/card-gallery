@@ -1,6 +1,6 @@
+import type { GetStaticProps } from 'next'
 import dynamic from 'next/dynamic'
 import Head from 'next/head'
-import type { GetStaticProps } from 'next'
 
 import { getCards } from '../lib/cards'
 import { filterViewableCards } from '../lib/viewableCards'
@@ -20,14 +20,14 @@ export const getStaticProps: GetStaticProps<GalleryProps> = async () => {
         return {
             redirect: {
                 destination: `/card/${cards[0].id}`,
-                permanent: false,
-            },
+                permanent: false
+            }
         }
     }
 
     return {
         props: { cards: [] },
-        revalidate: 60,
+        revalidate: 60
     }
 }
 

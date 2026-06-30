@@ -8,7 +8,7 @@
  * - "night": Quiet night viewing - darker, stronger contrast, whisper-quiet UI
  */
 
-export type ThemeMode = 'gallery' | 'study' | 'night'
+export type ThemeMode = 'gallery' | 'study' | 'night' | 'spotlight'
 
 // ============================================
 // Background & Atmosphere
@@ -131,10 +131,21 @@ export interface UIConfig {
 // Every animation in the experience reads from here
 // ============================================
 export interface MotionConfig {
+    // Incoming card settle duration (ms): the time it takes to rotate from
+    // face-on (orthogonal to the camera) into its resting angled pose
     cardTransitionDuration: number
     cardTransitionEasing: [number, number, number, number]
+    // Outgoing card fade-out duration (ms) — near-instant so the incoming card
+    // (held opaque behind it) is revealed without the background showing through
+    cardExitDuration: number
+    // Delay before the incoming card begins entering (ms); 0 = no stagger
+    cardEntryStagger: number
+    // Small positional offset for the incoming card; z is a tiny depth bias that
+    // parks it just behind the outgoing card for the reveal (no visible motion)
     cardEntryOffset: [number, number, number]
     cardExitOffset: [number, number, number]
+    // Resting rotation offset for the incoming card. The face-on entry rotation
+    // is computed from the live camera at transition time; this is added on top.
     cardEntryRotation: [number, number, number]
     cardExitRotation: [number, number, number]
 
@@ -197,6 +208,8 @@ export interface AtmosphereConfig {
     lightformerTopIntensity: number
     lightformerRimIntensity: number
     lightformerFillIntensity: number
+    // Front softbox — provides the subtle sheen visible at neutral card poses
+    lightformerFrontIntensity: number
 }
 
 // ============================================
@@ -232,16 +245,20 @@ export const galleryTheme: ThemeConfig = {
         filmGrainAnimated: false
     },
     lighting: {
-        // Bright, overhead-biased light with minimal drama
-        ambientIntensity: 0.92,
+        // Bright, overhead-biased light with minimal drama.
+        // Intensities are physical (three r155+ divides diffuse by PI),
+        // so the rig sums to ~PI on the card face for true-to-scan brightness.
+        // Key is kept modest (specular scales with directional intensity and
+        // blows out at grazing angles); ambient carries the brightness instead.
+        ambientIntensity: 2.74,
         ambientColor: '#fffdf9',
-        keyIntensity: 0.52,
+        keyIntensity: 0.85,
         keyColor: '#fffaf2',
         keyPosition: [1.5, 8.5, 2.5],
-        fillIntensity: 0.18,
+        fillIntensity: 0.46,
         fillColor: '#ffffff',
         fillPosition: [-5, 5, 1.5],
-        rimIntensity: 0.06,
+        rimIntensity: 0.15,
         rimColor: '#ffffff',
         rimPosition: [0, 4, -4],
         envMapIntensity: 0.08,
@@ -271,9 +288,11 @@ export const galleryTheme: ThemeConfig = {
     material: {
         roughness: 0.42,
         metalness: 0,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.3,
-        envMapIntensity: 0.16,
+        clearcoat: 0.45,
+        // Broader clearcoat lobe: spreads the softbox reflection so a soft sheen
+        // is visible near neutral and the grazing-angle peak is far less hot.
+        clearcoatRoughness: 0.38,
+        envMapIntensity: 0.42,
         normalScale: 0
     },
     ui: {
@@ -291,12 +310,14 @@ export const galleryTheme: ThemeConfig = {
         transitionEasing: 'cubic-bezier(0.25, 0.1, 0.25, 1.0)'
     },
     motion: {
-        cardTransitionDuration: 850,
+        cardTransitionDuration: 900,
         cardTransitionEasing: [0.22, 1, 0.36, 1],
-        cardEntryOffset: [0, -5.5, -1.5],
-        cardExitOffset: [0, 5.5, -1.5],
-        cardEntryRotation: [0.08, 0, 0],
-        cardExitRotation: [-0.08, 0, 0],
+        cardExitDuration: 100,
+        cardEntryStagger: 0,
+        cardEntryOffset: [0, 0, -0.06],
+        cardExitOffset: [0, 0, 0],
+        cardEntryRotation: [0, 0, 0],
+        cardExitRotation: [0, 0, 0],
         focusDuration: 1000,
         focusEasing: [0.22, 1, 0.36, 1],
         springStiffness: 120,
@@ -309,15 +330,15 @@ export const galleryTheme: ThemeConfig = {
         cursorTiltSmoothing: 0.07,
         scrollSensitivity: 500,
         scrollMomentumDecay: 0.95,
-        presentationTilt: 12,
+        presentationTilt: 12
     },
     atmosphere: {
-        toneMapping: 'aces',
+        toneMapping: 'neutral',
         toneMappingExposure: 1.0,
         bloomEnabled: true,
         bloomStrength: 0.2,
         bloomRadius: 0.6,
-        bloomThreshold: 0.92,
+        bloomThreshold: 1.5,
         dofBrowseEnabled: true,
         dofFocusDistance: 0.0,
         dofFocalLength: 0.035,
@@ -326,15 +347,19 @@ export const galleryTheme: ThemeConfig = {
         vignetteDarkness: 0.4,
         grainIntensity: 0.015,
         grainLuminanceOnly: true,
-        chromaticAberration: 0.0004,
+        chromaticAberration: 0,
         saturation: 0.12,
         envPreset: 'warehouse',
         envIntensity: 0.12,
         useCustomLightformers: true,
-        lightformerTopIntensity: 3.0,
+        lightformerTopIntensity: 2.0,
         lightformerRimIntensity: 1.5,
         lightformerFillIntensity: 0.8,
-    },
+        // With the broader clearcoat lobe the softbox reads as a soft sheen near
+        // neutral, so it no longer needs to be extremely HDR (which blew out at
+        // grazing angles). Tuned for a visible-but-gentle neutral glare.
+        lightformerFrontIntensity: 24
+    }
 }
 
 // ============================================
@@ -355,19 +380,20 @@ export const studyTheme: ThemeConfig = {
         filmGrainAnimated: false
     },
     lighting: {
-        // Biased 3-light rig: upper-left desk lamp feel
-        ambientIntensity: 0.42,
+        // Biased 3-light rig: upper-left desk lamp feel.
+        // Physical intensities: rig sums to ~0.95*PI on the card face.
+        ambientIntensity: 1.48,
         ambientColor: '#f3eee6',
         // Key: warm and directional, but no longer so orange that it muddies print colors
-        keyIntensity: 1.0,
+        keyIntensity: 1.5,
         keyColor: '#ffd39a',
         keyPosition: [-3.5, 4, 4],
         // Fill: softer and more neutral so the card keeps true colors
-        fillIntensity: 0.4,
+        fillIntensity: 0.95,
         fillColor: '#f6efe5',
         fillPosition: [4, 0, 3.5],
         // Rim: faint from back-right to catch slab edges
-        rimIntensity: 0.24,
+        rimIntensity: 0.55,
         rimColor: '#ffe2bc',
         rimPosition: [3.5, 2, -2.5],
         envMapIntensity: 0.16,
@@ -399,8 +425,9 @@ export const studyTheme: ThemeConfig = {
         roughness: 0.33,
         metalness: 0,
         clearcoat: 0.48,
-        clearcoatRoughness: 0.22,
-        envMapIntensity: 0.16,
+        // Broader clearcoat lobe for a soft sheen visible near neutral.
+        clearcoatRoughness: 0.34,
+        envMapIntensity: 0.36,
         normalScale: 0.015
     },
     ui: {
@@ -420,10 +447,12 @@ export const studyTheme: ThemeConfig = {
     motion: {
         cardTransitionDuration: 950,
         cardTransitionEasing: [0.2, 0, 0, 1],
-        cardEntryOffset: [0, -5.5, -1.5],
-        cardExitOffset: [0, 5.5, -1.5],
-        cardEntryRotation: [0.06, 0, 0],
-        cardExitRotation: [-0.06, 0, 0],
+        cardExitDuration: 110,
+        cardEntryStagger: 0,
+        cardEntryOffset: [0, 0, -0.06],
+        cardExitOffset: [0, 0, 0],
+        cardEntryRotation: [0, 0, 0],
+        cardExitRotation: [0, 0, 0],
         focusDuration: 1200,
         focusEasing: [0.2, 0, 0, 1],
         springStiffness: 100,
@@ -436,15 +465,15 @@ export const studyTheme: ThemeConfig = {
         cursorTiltSmoothing: 0.05,
         scrollSensitivity: 550,
         scrollMomentumDecay: 0.94,
-        presentationTilt: 15,
+        presentationTilt: 15
     },
     atmosphere: {
-        toneMapping: 'aces',
+        toneMapping: 'neutral',
         toneMappingExposure: 1.05,
         bloomEnabled: true,
         bloomStrength: 0.3,
         bloomRadius: 0.5,
-        bloomThreshold: 0.88,
+        bloomThreshold: 1.5,
         dofBrowseEnabled: true,
         dofFocusDistance: 0.0,
         dofFocalLength: 0.035,
@@ -453,15 +482,17 @@ export const studyTheme: ThemeConfig = {
         vignetteDarkness: 0.6,
         grainIntensity: 0.025,
         grainLuminanceOnly: false,
-        chromaticAberration: 0.0005,
+        chromaticAberration: 0,
         saturation: 0.1,
         envPreset: 'apartment',
         envIntensity: 0.12,
         useCustomLightformers: true,
-        lightformerTopIntensity: 2.5,
+        lightformerTopIntensity: 1.8,
         lightformerRimIntensity: 1.8,
         lightformerFillIntensity: 0.6,
-    },
+        // Soft front sheen, scaled down so it stays gentle in the warm low-key room.
+        lightformerFrontIntensity: 8
+    }
 }
 
 // ============================================
@@ -482,19 +513,20 @@ export const nightTheme: ThemeConfig = {
         filmGrainAnimated: false
     },
     lighting: {
-        // Dark environment, but with a cleaner neutral lift on the card itself
-        ambientIntensity: 0.4,
+        // Dark environment, but with a cleaner neutral lift on the card itself.
+        // Physical intensities: rig sums to ~0.93*PI on the card face.
+        ambientIntensity: 1.44,
         ambientColor: '#eceff6',
         // Key: gentle and slightly warm, still upper-left
-        keyIntensity: 0.88,
+        keyIntensity: 1.4,
         keyColor: '#f5ede4',
         keyPosition: [-3, 3.5, 4.5],
         // Fill: enough to keep the artwork readable while the room stays dark
-        fillIntensity: 0.34,
+        fillIntensity: 0.82,
         fillColor: '#eef2fa',
         fillPosition: [4, 0, 3],
         // Rim: subtle
-        rimIntensity: 0.22,
+        rimIntensity: 0.52,
         rimColor: '#dbe2f2',
         rimPosition: [3, 2, -3],
         envMapIntensity: 0.12,
@@ -526,8 +558,9 @@ export const nightTheme: ThemeConfig = {
         roughness: 0.34,
         metalness: 0,
         clearcoat: 0.42,
-        clearcoatRoughness: 0.24,
-        envMapIntensity: 0.14,
+        // Broader clearcoat lobe for a soft sheen visible near neutral.
+        clearcoatRoughness: 0.34,
+        envMapIntensity: 0.34,
         normalScale: 0.01
     },
     ui: {
@@ -545,12 +578,14 @@ export const nightTheme: ThemeConfig = {
         transitionEasing: 'cubic-bezier(0.2, 0.0, 0.0, 1.0)'
     },
     motion: {
-        cardTransitionDuration: 1050,
+        cardTransitionDuration: 1000,
         cardTransitionEasing: [0.2, 0, 0, 1],
-        cardEntryOffset: [0, -5.5, -1.5],
-        cardExitOffset: [0, 5.5, -1.5],
-        cardEntryRotation: [0.05, 0, 0],
-        cardExitRotation: [-0.05, 0, 0],
+        cardExitDuration: 120,
+        cardEntryStagger: 0,
+        cardEntryOffset: [0, 0, -0.06],
+        cardExitOffset: [0, 0, 0],
+        cardEntryRotation: [0, 0, 0],
+        cardExitRotation: [0, 0, 0],
         focusDuration: 1400,
         focusEasing: [0.2, 0, 0, 1],
         springStiffness: 80,
@@ -563,15 +598,15 @@ export const nightTheme: ThemeConfig = {
         cursorTiltSmoothing: 0.04,
         scrollSensitivity: 600,
         scrollMomentumDecay: 0.93,
-        presentationTilt: 12,
+        presentationTilt: 12
     },
     atmosphere: {
-        toneMapping: 'aces',
+        toneMapping: 'neutral',
         toneMappingExposure: 0.95,
         bloomEnabled: true,
         bloomStrength: 0.28,
         bloomRadius: 0.5,
-        bloomThreshold: 0.85,
+        bloomThreshold: 1.5,
         dofBrowseEnabled: true,
         dofFocusDistance: 0.0,
         dofFocalLength: 0.035,
@@ -580,15 +615,40 @@ export const nightTheme: ThemeConfig = {
         vignetteDarkness: 0.72,
         grainIntensity: 0.018,
         grainLuminanceOnly: true,
-        chromaticAberration: 0.0006,
+        chromaticAberration: 0,
         saturation: 0.08,
         envPreset: 'city',
         envIntensity: 0.1,
         useCustomLightformers: true,
-        lightformerTopIntensity: 2.0,
+        lightformerTopIntensity: 1.5,
         lightformerRimIntensity: 1.4,
         lightformerFillIntensity: 0.5,
-    },
+        // Soft front sheen, kept low so the quiet night mood is preserved.
+        lightformerFrontIntensity: 7
+    }
+}
+
+// ============================================
+// Spotlight Theme (Per-Card Color Background)
+// ============================================
+// Neutral dark base. The background gradient is overridden at runtime in the
+// Vault from the active card's stored `backgroundColor` (see Vault.tsx). The
+// values below act as the fallback when a card has no color assigned.
+export const spotlightTheme: ThemeConfig = {
+    ...nightTheme,
+    name: 'spotlight',
+    background: {
+        ...nightTheme.background,
+        gradientCenter: '#1a1a1d',
+        gradientMid: '#121214',
+        gradientEdge: '#08080a',
+        // Let the color field read clean — minimal vignette/grain over it.
+        vignetteOpacity: 0.4,
+        vignetteStart: 35,
+        vignetteEdgeOnly: true,
+        textureOpacity: 0,
+        filmGrainOpacity: 0.012
+    }
 }
 
 // ============================================
@@ -597,7 +657,8 @@ export const nightTheme: ThemeConfig = {
 export const themes: Record<ThemeMode, ThemeConfig> = {
     gallery: galleryTheme,
     study: studyTheme,
-    night: nightTheme
+    night: nightTheme,
+    spotlight: spotlightTheme
 }
 
 // Default theme

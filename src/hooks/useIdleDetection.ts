@@ -14,7 +14,7 @@ export function useIdleDetection(options: UseIdleDetectionOptions = {}) {
 
     const resetIdleTimer = useCallback(() => {
         lastInteractionRef.current = Date.now()
-        
+
         if (isIdle) {
             setIsIdle(false)
             onActive?.()
@@ -48,6 +48,6 @@ export function useIdleDetection(options: UseIdleDetectionOptions = {}) {
     return {
         isIdle,
         lastInteraction: lastInteractionRef,
-        markInteraction,
+        markInteraction
     }
 }

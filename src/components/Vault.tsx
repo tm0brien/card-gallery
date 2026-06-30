@@ -1,43 +1,39 @@
 import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei'
-import { Canvas, useThree } from '@react-three/fiber'
-import {
-    Bloom,
-    ChromaticAberration,
-    EffectComposer,
-    HueSaturation,
-    Noise,
-    Vignette,
-} from '@react-three/postprocessing'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Bloom, ChromaticAberration, EffectComposer, HueSaturation, Noise, Vignette } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import {
-    Suspense,
     memo,
+    type RefObject,
     startTransition,
+    Suspense,
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
-    useState,
+    useState
 } from 'react'
 import * as THREE from 'three'
 
 import { type AtmosphereConfig, type ThemeConfig } from '../config/theme'
 import { useTheme } from '../context/ThemeContext'
 import { useCompositedVideoTexture } from '../hooks/useCompositedVideoTexture'
-import { getCardDimensions } from '../lib/cardDimensions'
+import { deriveBackgroundGradient } from '../lib/backgroundGradient'
+import { CARD_AREA_MEAN_SIDE, getCardDimensions } from '../lib/cardDimensions'
 import type { CardOrientation } from '../lib/cardOrientation'
-import { calculateFitDistance } from '../lib/transition/viewerPose'
-import { preloadAdjacentCardAssets } from '../lib/transition/assetPreloader'
 import { InvalidateRegistrar } from '../lib/invalidateCanvas'
-import type { CardData, CardSummary } from '../types/card'
-import CardRuler from './CardRuler'
+import { preloadAdjacentCardAssets } from '../lib/transition/assetPreloader'
+import { clamp01, cubicBezier, lerp } from '../lib/transition/easing'
+import { calculateFitDistance } from '../lib/transition/viewerPose'
+import styles from '../styles/Vault.module.css'
+import type { CardSummary } from '../types/card'
+import RolodexNav from './RolodexNav'
 import CardSlab from './CardSlab'
-import DebugPanel, { kelvinToHex, sphericalToXyz, type DebugOverrides } from './DebugPanel'
-import InfoPanel from './InfoPanel'
+import DebugPanel, { type DebugOverrides, kelvinToHex, sphericalToXyz } from './DebugPanel'
 import RemixGallery from './RemixGallery'
 import RemixModal from './RemixModal'
 import ThemeSwitcher from './ThemeSwitcher'
-import styles from '../styles/Vault.module.css'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -45,14 +41,22 @@ import styles from '../styles/Vault.module.css'
 
 const INSPECT_FOV = 38
 
+/** URL of a card's default/featured remix video, or null when it has none. */
+function defaultVideoUrlFor(card: CardSummary | undefined): string | null {
+    if (!card?.hasAssets || !card.defaultRemixFilename) return null
+    return `/assets/${card.id}/remixes/${card.defaultRemixFilename}`
+}
+
 function setInspectCameraPose(
     camera: THREE.Camera,
-    size: { width: number; height: number },
-    orientation: CardOrientation,
+    size: { width: number; height: number }
 ) {
-    const { width, height } = getCardDimensions(orientation)
     const aspect = size.width / size.height
-    const distance = calculateFitDistance(width, height, INSPECT_FOV, aspect, 1.25)
+    // Both portrait and landscape cards have equal face area. Fitting to the
+    // geometric-mean side (√(w×h)) treats both as an equivalent square, so the
+    // camera lands at the same distance regardless of orientation — the
+    // apparent face area is consistent when switching between cards.
+    const distance = calculateFitDistance(CARD_AREA_MEAN_SIDE, CARD_AREA_MEAN_SIDE, INSPECT_FOV, aspect, 1.05)
     const azimuth = -Math.PI * 0.1
     const elevation = Math.PI * 0.015
     const x = distance * 1.35 * Math.sin(azimuth) * Math.cos(elevation)
@@ -69,20 +73,14 @@ function setInspectCameraPose(
 // OrbitCamera — always-on inspect orbit controls
 // ---------------------------------------------------------------------------
 
-function OrbitCamera({
-    theme,
-    orientation,
-}: {
-    theme: ThemeConfig
-    orientation: CardOrientation
-}) {
+function OrbitCamera({ theme, orientation }: { theme: ThemeConfig; orientation: CardOrientation }) {
     const controlsRef = useRef<any>(null)
     const { camera, size, invalidate } = useThree()
 
     // Refit whenever the viewport or the card's orientation changes, so
     // portrait/landscape swaps and window resizes keep consistent framing.
     useEffect(() => {
-        setInspectCameraPose(camera, size, orientation)
+        setInspectCameraPose(camera, size)
         if (controlsRef.current?.target) {
             controlsRef.current.target.set(0, 0, 0)
             controlsRef.current.update()
@@ -119,17 +117,29 @@ const DisplayCard = memo(function DisplayCard({
     card,
     theme,
     activeVideoUrl,
+    opacityRef,
+    onReady
 }: {
     card: CardSummary
     theme: ThemeConfig
     activeVideoUrl: string | null
+    opacityRef?: React.MutableRefObject<number>
+    onReady?: () => void
 }) {
     const assetPath = `/assets/${card.id}`
     const videoTexture = useCompositedVideoTexture(
         card.hasAssets ? activeVideoUrl : null,
         `${assetPath}/front.png`,
-        `${assetPath}/mask.png`,
+        `${assetPath}/mask.png`
     )
+
+    // Fires only once this card's subtree (including its suspended textures)
+    // has resolved and committed, so the crossfade never reveals a blank slab.
+    const onReadyRef = useRef(onReady)
+    onReadyRef.current = onReady
+    useEffect(() => {
+        onReadyRef.current?.()
+    }, [])
 
     return (
         <CardSlab
@@ -139,7 +149,261 @@ const DisplayCard = memo(function DisplayCard({
             isIdle={false}
             theme={theme}
             videoTexture={videoTexture}
+            opacityRef={opacityRef}
         />
+    )
+})
+
+// ---------------------------------------------------------------------------
+// CardCrossfade — choreographed two-slot card transition
+//
+// On navigation the previous card becomes the "outgoing" slot (fades out fast,
+// drifting back slightly) while the new card mounts as the "incoming" slot and,
+// once its textures are ready, fades in and rises gently from below. Animation
+// values live in refs and are driven from a single useFrame clock so the demand
+// frameloop only runs while a transition is active.
+// ---------------------------------------------------------------------------
+
+type TransitionPhase = 'idle' | 'waiting' | 'running'
+
+interface TransitionController {
+    phase: TransitionPhase
+    startTime: number | null
+    exitDuration: number
+    entryDuration: number
+    stagger: number
+    entryOffset: [number, number, number]
+    exitOffset: [number, number, number]
+    entryRotation: [number, number, number]
+    exitRotation: [number, number, number]
+}
+
+function usePrefersReducedMotion() {
+    const [reduced, setReduced] = useState(false)
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+        setReduced(mq.matches)
+        const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
+        mq.addEventListener('change', handler)
+        return () => mq.removeEventListener('change', handler)
+    }, [])
+    return reduced
+}
+
+function applyRenderOrder(group: THREE.Group | null, order: number) {
+    if (!group) return
+    group.traverse(obj => {
+        obj.renderOrder = order
+    })
+}
+
+// The card's front face points along +Z at rest, but the camera views it from a
+// slight angle, so at rest it reads as 3D (its edge is visible). To enter
+// "orthogonal to the camera" (flat-on, like a 2D image) we rotate the card so
+// its +Z normal points straight at the camera; animating that back to the rest
+// rotation makes it subtly turn and reveal its thickness. Derived from the live
+// camera so it stays correct even after the user orbits.
+function computeFaceCameraRotation(camera: THREE.Camera): [number, number, number] {
+    const p = camera.position
+    const len = Math.hypot(p.x, p.y, p.z) || 1
+    const nx = p.x / len
+    const ny = p.y / len
+    const nz = p.z / len
+    const faceY = Math.atan2(nx, nz)
+    const faceX = -Math.asin(Math.max(-1, Math.min(1, ny)))
+    return [faceX, faceY, 0]
+}
+
+const ZERO_VEC: [number, number, number] = [0, 0, 0]
+
+const CardCrossfade = memo(function CardCrossfade({
+    card,
+    theme,
+    activeVideoUrl,
+    onEntryStartRef
+}: {
+    card: CardSummary
+    theme: ThemeConfig
+    activeVideoUrl: string | null
+    onEntryStartRef: RefObject<() => void>
+}) {
+    const { invalidate, camera } = useThree()
+    const reducedMotion = usePrefersReducedMotion()
+
+    const [outgoing, setOutgoing] = useState<CardSummary | null>(null)
+    const prevCardRef = useRef(card)
+
+    const incomingOpacity = useRef(1)
+    const outgoingOpacity = useRef(1)
+    const incomingGroupRef = useRef<THREE.Group>(null)
+    const outgoingGroupRef = useRef<THREE.Group>(null)
+    const renderOrderApplied = useRef(false)
+    const outgoingDropped = useRef(false)
+
+    const controller = useRef<TransitionController>({
+        phase: 'idle',
+        startTime: null,
+        exitDuration: 0,
+        entryDuration: 0,
+        stagger: 0,
+        entryOffset: ZERO_VEC,
+        exitOffset: ZERO_VEC,
+        entryRotation: ZERO_VEC,
+        exitRotation: ZERO_VEC
+    })
+
+    const entryEase = useMemo(() => cubicBezier(theme.motion.cardTransitionEasing), [theme.motion.cardTransitionEasing])
+
+    // Arm a transition whenever the target card changes. Runs before paint so
+    // the refs are set before the next R3F frame samples them. The incoming
+    // slab is held fully opaque and parked just behind the outgoing slab, so
+    // when the outgoing slab fades out the new card is revealed directly —
+    // the bright background is never visible between the two.
+    useLayoutEffect(() => {
+        if (prevCardRef.current.id === card.id) return
+        const previous = prevCardRef.current
+        prevCardRef.current = card
+
+        const m = theme.motion
+        // Start the incoming card face-on to the camera, plus any configured
+        // resting offset; it rotates from here back to rest (0,0,0).
+        const face = computeFaceCameraRotation(camera)
+        const entryRotation: [number, number, number] = reducedMotion
+            ? ZERO_VEC
+            : [face[0] + m.cardEntryRotation[0], face[1] + m.cardEntryRotation[1], face[2] + m.cardEntryRotation[2]]
+        controller.current = {
+            phase: 'waiting',
+            startTime: null,
+            exitDuration: m.cardExitDuration,
+            entryDuration: m.cardTransitionDuration,
+            stagger: m.cardEntryStagger,
+            entryOffset: reducedMotion ? ZERO_VEC : m.cardEntryOffset,
+            exitOffset: reducedMotion ? ZERO_VEC : m.cardExitOffset,
+            entryRotation,
+            exitRotation: reducedMotion ? ZERO_VEC : m.cardExitRotation
+        }
+        // Hidden until ready so the outgoing card fully covers it while its
+        // textures load; flipped opaque the instant the fade begins.
+        incomingOpacity.current = 0
+        outgoingOpacity.current = 1
+        renderOrderApplied.current = false
+        outgoingDropped.current = false
+
+        // Park the incoming slab face-on (and a hair behind the outgoing card)
+        // so it is already oriented when revealed — no first-frame jump.
+        const inGroup = incomingGroupRef.current
+        if (inGroup) {
+            const o = controller.current.entryOffset
+            const r = controller.current.entryRotation
+            inGroup.position.set(o[0], o[1], o[2])
+            inGroup.rotation.set(r[0], r[1], r[2])
+        }
+        const outGroup = outgoingGroupRef.current
+        if (outGroup) {
+            outGroup.position.set(0, 0, 0)
+            outGroup.rotation.set(0, 0, 0)
+        }
+
+        setOutgoing(previous)
+        invalidate()
+    }, [card.id, theme.motion, reducedMotion, invalidate, camera])
+
+    const startEntry = useCallback(() => {
+        const c = controller.current
+        c.phase = 'running'
+        c.startTime = performance.now()
+        incomingOpacity.current = 1
+        outgoingOpacity.current = 0
+        if (!outgoingDropped.current) {
+            outgoingDropped.current = true
+            setOutgoing(null)
+        }
+        // Fire the background fade at the same moment the card starts rotating
+        // so the colour shift accompanies the entry animation.
+        onEntryStartRef.current?.()
+        invalidate()
+    }, [invalidate, onEntryStartRef])
+
+    const handleIncomingReady = useCallback(() => {
+        const c = controller.current
+        if (c.phase !== 'waiting') return
+        startEntry()
+    }, [startEntry])
+
+    useFrame(() => {
+        const c = controller.current
+
+        if (c.phase !== 'running' || c.startTime == null) return
+
+        if (!renderOrderApplied.current) {
+            applyRenderOrder(incomingGroupRef.current, 0)
+            renderOrderApplied.current = true
+        }
+
+        const elapsed = performance.now() - c.startTime
+
+        // Incoming: appears fully opaque (the old card is already gone) and
+        // rotates from face-on (orthogonal to the camera) into its resting
+        // angled pose, revealing its 3D thickness.
+        const entryT = c.entryDuration > 0 ? clamp01(elapsed / c.entryDuration) : 1
+        const entryE = entryEase(entryT)
+        incomingOpacity.current = 1
+        const inGroup = incomingGroupRef.current
+        if (inGroup) {
+            inGroup.position.set(
+                lerp(c.entryOffset[0], 0, entryE),
+                lerp(c.entryOffset[1], 0, entryE),
+                lerp(c.entryOffset[2], 0, entryE)
+            )
+            inGroup.rotation.set(
+                lerp(c.entryRotation[0], 0, entryE),
+                lerp(c.entryRotation[1], 0, entryE),
+                lerp(c.entryRotation[2], 0, entryE)
+            )
+        }
+
+        if (entryT >= 1) {
+            if (inGroup) {
+                inGroup.position.set(0, 0, 0)
+                inGroup.rotation.set(0, 0, 0)
+            }
+            c.phase = 'idle'
+            c.startTime = null
+            invalidate()
+            return
+        }
+
+        invalidate()
+    })
+
+    return (
+        <>
+            <group ref={incomingGroupRef}>
+                <Suspense fallback={null}>
+                    <DisplayCard
+                        key={card.id}
+                        card={card}
+                        theme={theme}
+                        activeVideoUrl={activeVideoUrl}
+                        opacityRef={incomingOpacity}
+                        onReady={handleIncomingReady}
+                    />
+                </Suspense>
+            </group>
+            {outgoing && (
+                <group ref={outgoingGroupRef}>
+                    <Suspense fallback={null}>
+                        <DisplayCard
+                            key={outgoing.id}
+                            card={outgoing}
+                            theme={theme}
+                            activeVideoUrl={null}
+                            opacityRef={outgoingOpacity}
+                        />
+                    </Suspense>
+                </group>
+            )}
+        </>
     )
 })
 
@@ -147,7 +411,7 @@ const DisplayCard = memo(function DisplayCard({
 // StudioLighting — theme-driven 3-point light rig
 // ---------------------------------------------------------------------------
 
-const StudioLighting = memo(function StudioLighting({ theme }: { theme: ThemeConfig }) {
+export const StudioLighting = memo(function StudioLighting({ theme }: { theme: ThemeConfig }) {
     const { lighting } = theme
 
     return (
@@ -184,9 +448,9 @@ const StudioLighting = memo(function StudioLighting({ theme }: { theme: ThemeCon
 // StudioEnvironment — custom Lightformer rig or HDRI preset
 // ---------------------------------------------------------------------------
 
-const StudioEnvironment = memo(function StudioEnvironment({
+export const StudioEnvironment = memo(function StudioEnvironment({
     atmosphere,
-    theme,
+    theme
 }: {
     atmosphere: AtmosphereConfig
     theme: ThemeConfig
@@ -200,6 +464,7 @@ const StudioEnvironment = memo(function StudioEnvironment({
     const topColor = isWarm ? '#ffe4b5' : isCool ? '#b0c4de' : '#ffffff'
     const rimColor = isWarm ? '#ffcb7a' : isCool ? '#8aabcf' : '#e8f0ff'
     const fillColor = isWarm ? '#f5e6d0' : isCool ? '#d0d8e8' : '#f0f0f8'
+    const frontColor = isWarm ? '#fdf3e3' : isCool ? '#e4e9f4' : '#ffffff'
 
     return (
         <Environment resolution={256} environmentIntensity={atmosphere.envIntensity}>
@@ -227,6 +492,17 @@ const StudioEnvironment = memo(function StudioEnvironment({
                 scale={[4, 4, 1]}
                 target={[0, 0, 0]}
             />
+            {/* Front softbox: sits along the neutral-pose mirror direction so a
+                soft vertical glare band is visible on the face before the card
+                is tilted, and sweeps across it during rotation. */}
+            <Lightformer
+                intensity={atmosphere.lightformerFrontIntensity}
+                form="rect"
+                color={frontColor}
+                position={[2.5, 1.5, 6]}
+                scale={[3, 6, 1]}
+                target={[0, 0, 0]}
+            />
         </Environment>
     )
 })
@@ -235,45 +511,31 @@ const StudioEnvironment = memo(function StudioEnvironment({
 // PostProcessing — GPU effects driven by AtmosphereConfig
 // ---------------------------------------------------------------------------
 
-const PostProcessing = memo(function PostProcessing({
-    atmosphere,
-}: {
-    atmosphere: AtmosphereConfig
-}) {
+export const PostProcessing = memo(function PostProcessing({ atmosphere }: { atmosphere: AtmosphereConfig }) {
     const caOffset = useMemo(
         () => new THREE.Vector2(atmosphere.chromaticAberration, atmosphere.chromaticAberration * 0.5),
-        [atmosphere.chromaticAberration],
+        [atmosphere.chromaticAberration]
     )
 
     const bloomIntensity = atmosphere.bloomEnabled ? atmosphere.bloomStrength : 0
     const grainOpacity = atmosphere.grainIntensity * 0.35
 
     return (
-        <EffectComposer multisampling={0}>
+        <EffectComposer multisampling={4}>
             <Bloom
                 intensity={bloomIntensity}
                 luminanceThreshold={atmosphere.bloomThreshold}
                 luminanceSmoothing={atmosphere.bloomRadius}
                 mipmapBlur
             />
-            <HueSaturation
-                blendFunction={BlendFunction.NORMAL}
-                saturation={atmosphere.saturation}
-            />
-            <ChromaticAberration
-                blendFunction={BlendFunction.NORMAL}
-                offset={caOffset}
-            />
+            <HueSaturation blendFunction={BlendFunction.NORMAL} saturation={atmosphere.saturation} />
+            <ChromaticAberration blendFunction={BlendFunction.NORMAL} offset={caOffset} />
             <Vignette
                 offset={atmosphere.vignetteOffset}
                 darkness={atmosphere.vignetteDarkness}
                 blendFunction={BlendFunction.NORMAL}
             />
-            <Noise
-                premultiply
-                blendFunction={BlendFunction.SOFT_LIGHT}
-                opacity={grainOpacity}
-            />
+            <Noise premultiply blendFunction={BlendFunction.SOFT_LIGHT} opacity={grainOpacity} />
         </EffectComposer>
     )
 })
@@ -295,9 +557,9 @@ function ToneMappingUpdater({ exposure }: { exposure: number }) {
 // SlabShadow — soft contact shadow grounding the slab
 // ---------------------------------------------------------------------------
 
-const SlabShadow = memo(function SlabShadow({
+export const SlabShadow = memo(function SlabShadow({
     theme,
-    orientation,
+    orientation
 }: {
     theme: ThemeConfig
     orientation: CardOrientation
@@ -329,11 +591,13 @@ function VaultScene({
     currentIndex,
     theme,
     activeVideoUrl,
+    onEntryStartRef
 }: {
     cards: CardSummary[]
     currentIndex: number
     theme: ThemeConfig
     activeVideoUrl: string | null
+    onEntryStartRef: RefObject<() => void>
 }) {
     const { atmosphere } = theme
     const card = cards[currentIndex]
@@ -346,23 +610,19 @@ function VaultScene({
             <OrbitCamera theme={theme} orientation={orientation} />
 
             {card && (
-                // Suspense wraps only the card: while textures of a newly
-                // selected card load, the rest of the scene stays rendered and
-                // startTransition keeps the previous card on screen.
-                <Suspense fallback={null}>
-                    <DisplayCard
-                        key={card.id}
+                <>
+                    {/* CardCrossfade owns its own per-slot Suspense boundaries so
+                        the outgoing card stays on screen until the incoming
+                        card's textures are ready, then they crossfade. */}
+                    <CardCrossfade
                         card={card}
                         theme={theme}
                         activeVideoUrl={activeVideoUrl}
+                        onEntryStartRef={onEntryStartRef}
                     />
                     {/* Keyed so the one-frame shadow bake re-runs per card/theme */}
-                    <SlabShadow
-                        key={`shadow-${card.id}-${theme.name}`}
-                        theme={theme}
-                        orientation={orientation}
-                    />
-                </Suspense>
+                    <SlabShadow key={`shadow-${card.id}-${theme.name}`} theme={theme} orientation={orientation} />
+                </>
             )}
 
             <PostProcessing atmosphere={atmosphere} />
@@ -374,8 +634,16 @@ function VaultScene({
 // Vault — the main exported component
 // ---------------------------------------------------------------------------
 
-export default function Vault({ cards: initialCards, initialCardId }: { cards: CardSummary[]; initialCardId?: string | null }) {
-    const { theme, themeMode, setThemeMode } = useTheme()
+export default function Vault({
+    cards: initialCards,
+    initialCardId,
+    onCardChange
+}: {
+    cards: CardSummary[]
+    initialCardId?: string | null
+    onCardChange?: (card: CardSummary) => void
+}) {
+    const { theme, themeMode, setThemeMode, previewSpotlightColor } = useTheme()
 
     const [debugOverrides, setDebugOverrides] = useState<DebugOverrides | null>(null)
 
@@ -395,7 +663,7 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
                 fillPosition: sphericalToXyz(o.fill.azimuth, o.fill.elevation, 10),
                 rimIntensity: o.rim.intensity,
                 rimColor: kelvinToHex(o.rim.kelvin),
-                rimPosition: sphericalToXyz(o.rim.azimuth, o.rim.elevation, 10),
+                rimPosition: sphericalToXyz(o.rim.azimuth, o.rim.elevation, 10)
             },
             atmosphere: {
                 ...theme.atmosphere,
@@ -403,6 +671,7 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
                 lightformerTopIntensity: o.lightformerTopIntensity,
                 lightformerRimIntensity: o.lightformerRimIntensity,
                 lightformerFillIntensity: o.lightformerFillIntensity,
+                lightformerFrontIntensity: o.lightformerFrontIntensity,
                 bloomStrength: o.bloomStrength,
                 bloomThreshold: o.bloomThreshold,
                 vignetteOffset: o.vignetteOffset,
@@ -411,34 +680,42 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
                 saturation: o.saturation,
                 grainIntensity: o.grainIntensity,
                 dofBokehScale: o.dofBokehScale,
-                toneMappingExposure: o.toneMappingExposure,
+                toneMappingExposure: o.toneMappingExposure
             },
             material: {
                 ...theme.material,
                 clearcoat: o.clearcoat,
                 clearcoatRoughness: o.clearcoatRoughness,
                 roughness: o.roughness,
-                envMapIntensity: o.envMapIntensity,
+                envMapIntensity: o.envMapIntensity
             },
             motion: {
                 ...theme.motion,
                 cursorTiltStrength: o.cursorTiltStrength,
-                presentationTilt: o.presentationTilt,
-            },
+                presentationTilt: o.presentationTilt
+            }
         }
     }, [theme, debugOverrides])
 
     const cards = initialCards
     const [currentIndex, setCurrentIndex] = useState(() => {
         if (initialCardId) {
-            const idx = initialCards.findIndex((c) => c.id === initialCardId)
+            const idx = initialCards.findIndex(c => c.id === initialCardId)
             return idx >= 0 ? idx : 0
         }
         return 0
     })
     const invalidateRef = useRef<() => void>(() => {})
-    const [cardData, setCardData] = useState<CardData | null>(null)
-    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null)
+
+    useEffect(() => {
+        const c = initialCards[currentIndex]
+        if (c) onCardChange?.(c)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentIndex])
+
+    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(() =>
+        defaultVideoUrlFor(initialCards[currentIndex])
+    )
     const [showRemix, setShowRemix] = useState(false)
 
     const card = cards[currentIndex]
@@ -446,24 +723,6 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
     useEffect(() => {
         preloadAdjacentCardAssets(cards, currentIndex)
     }, [cards, currentIndex])
-
-    useEffect(() => {
-        // Clear immediately so the panel never shows the previous card's data.
-        setCardData(null)
-        if (!card?.hasAssets) return
-
-        let cancelled = false
-        fetch(`/assets/${card.id}/card-data.json`)
-            .then((res) => res.json())
-            .then((data: CardData) => {
-                if (!cancelled) setCardData(data)
-            })
-            .catch(() => undefined)
-
-        return () => {
-            cancelled = true
-        }
-    }, [card])
 
     useEffect(() => {
         if (!card) return
@@ -477,11 +736,11 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
         const syncFromUrl = () => {
             const match = window.location.pathname.match(/^\/card\/([^/]+)/)
             if (!match) return
-            const idx = cards.findIndex((c) => c.id === match[1])
+            const idx = cards.findIndex(c => c.id === match[1])
             if (idx >= 0) {
                 startTransition(() => {
                     setCurrentIndex(idx)
-                    setActiveVideoUrl(null)
+                    setActiveVideoUrl(defaultVideoUrlFor(cards[idx]))
                 })
                 invalidateRef.current()
             }
@@ -490,18 +749,21 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
         return () => window.removeEventListener('popstate', syncFromUrl)
     }, [cards])
 
-    const goToCardIndex = useCallback((index: number) => {
-        if (index === currentIndex) return
-        if (index < 0 || index >= cards.length) return
+    const goToCardIndex = useCallback(
+        (index: number) => {
+            if (index === currentIndex) return
+            if (index < 0 || index >= cards.length) return
 
-        // Transition keeps the current card rendered while the next card's
-        // textures load, instead of suspending to a blank canvas.
-        startTransition(() => {
-            setCurrentIndex(index)
-            setActiveVideoUrl(null)
-        })
-        invalidateRef.current()
-    }, [currentIndex, cards.length])
+            // Transition keeps the current card rendered while the next card's
+            // textures load, instead of suspending to a blank canvas.
+            startTransition(() => {
+                setCurrentIndex(index)
+                setActiveVideoUrl(defaultVideoUrlFor(cards[index]))
+            })
+            invalidateRef.current()
+        },
+        [currentIndex, cards]
+    )
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -515,20 +777,137 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
         return () => window.removeEventListener('keydown', handler)
     }, [currentIndex, cards.length, goToCardIndex])
 
-    const toneMapping = liveTheme.atmosphere.toneMapping === 'aces'
-        ? THREE.ACESFilmicToneMapping
-        : liveTheme.atmosphere.toneMapping === 'reinhard'
-            ? THREE.ReinhardToneMapping
-            : THREE.NeutralToneMapping
+    const toneMapping =
+        liveTheme.atmosphere.toneMapping === 'aces'
+            ? THREE.ACESFilmicToneMapping
+            : liveTheme.atmosphere.toneMapping === 'reinhard'
+              ? THREE.ReinhardToneMapping
+              : THREE.NeutralToneMapping
+
+    // In "Spotlight" mode the backdrop is built from the active card's stored
+    // color. Two absolutely-positioned layers crossfade via RAF so background
+    // transitions smoothly when switching cards instead of cutting instantly.
+    // previewSpotlightColor (set by the admin panel) takes priority so color
+    // changes preview live without saving.
+    const bgBottomRef = useRef<HTMLDivElement>(null)
+    const bgTopRef = useRef<HTMLDivElement>(null)
+    const bgCurrentRef = useRef<string>('')
+    const bgRafRef = useRef<number>(0)
+    // Stores the gradient to apply when the next card entry animation begins,
+    // so the background doesn't change until the incoming card starts rotating.
+    const pendingCardBgRef = useRef<string | null>(null)
+
+    const makeSpotlightGradient = useCallback(
+        (color: string | undefined | null) => {
+            const { center, mid, edge } = deriveBackgroundGradient(color)
+            return `radial-gradient(circle at 50% 42%, ${center} 0%, ${mid} 45%, ${edge} 100%)`
+        },
+        []
+    )
+
+    const triggerBgFade = useCallback(
+        (next: string) => {
+            const prev = bgCurrentRef.current
+            bgCurrentRef.current = next
+            pendingCardBgRef.current = null
+
+            const bottom = bgBottomRef.current
+            const top = bgTopRef.current
+            if (!bottom || !top) return
+
+            if (!prev) {
+                // Initial mount: set immediately, no animation.
+                bottom.style.background = next
+                top.style.opacity = '0'
+                return
+            }
+
+            cancelAnimationFrame(bgRafRef.current)
+
+            const duration = liveTheme.motion.cardTransitionDuration * 0.75
+            const ease = cubicBezier([0.4, 0, 0.2, 1])
+            const startTime = performance.now()
+
+            bottom.style.background = prev
+            top.style.background = next
+            top.style.opacity = '0'
+
+            const animate = (now: number) => {
+                const t = clamp01((now - startTime) / duration)
+                top.style.opacity = String(ease(t))
+                if (t < 1) {
+                    bgRafRef.current = requestAnimationFrame(animate)
+                } else {
+                    bottom.style.background = next
+                    top.style.opacity = '0'
+                }
+            }
+
+            bgRafRef.current = requestAnimationFrame(animate)
+        },
+        [liveTheme.motion.cardTransitionDuration]
+    )
+
+    useEffect(() => {
+        if (themeMode !== 'spotlight') {
+            bgCurrentRef.current = ''
+            pendingCardBgRef.current = null
+            cancelAnimationFrame(bgRafRef.current)
+            return
+        }
+
+        if (previewSpotlightColor != null) {
+            // Admin live-preview: update the background immediately.
+            triggerBgFade(makeSpotlightGradient(previewSpotlightColor))
+            return
+        }
+
+        const next = makeSpotlightGradient(card?.backgroundColor)
+
+        if (!bgCurrentRef.current) {
+            // Initial mount in spotlight: set immediately, no animation.
+            triggerBgFade(next)
+            return
+        }
+
+        if (next === bgCurrentRef.current) {
+            pendingCardBgRef.current = null
+            return
+        }
+
+        // Card switch: store the gradient and cancel any in-flight fade.
+        // The fade will begin when the incoming card's entry animation starts
+        // so the colour shift accompanies the rotation rather than preceding it.
+        pendingCardBgRef.current = next
+        cancelAnimationFrame(bgRafRef.current)
+    }, [themeMode, card?.backgroundColor, previewSpotlightColor, makeSpotlightGradient, triggerBgFade])
+
+    // Callback invoked by CardCrossfade the moment card entry begins.
+    // Kept as a ref so CardCrossfade never needs to re-render when it changes.
+    const onEntryStartRef = useRef<() => void>(() => {})
+    onEntryStartRef.current = () => {
+        if (pendingCardBgRef.current) {
+            triggerBgFade(pendingCardBgRef.current)
+        }
+    }
 
     return (
-        <div className={styles.vault} data-theme={themeMode}>
+        <div
+            className={styles.vault}
+            data-theme={themeMode}
+        >
+            {themeMode === 'spotlight' && (
+                <>
+                    <div ref={bgBottomRef} className={styles.bgLayer} />
+                    <div ref={bgTopRef} className={styles.bgLayer} />
+                </>
+            )}
             <Canvas
                 className={styles.canvas}
                 frameloop="demand"
                 gl={{
                     antialias: true,
-                    toneMapping,
+                    toneMapping
                 }}
                 dpr={[1, 2]}
                 camera={{ fov: INSPECT_FOV, position: [0, 1, 6] }}
@@ -542,18 +921,14 @@ export default function Vault({ cards: initialCards, initialCardId }: { cards: C
                         currentIndex={currentIndex}
                         theme={liveTheme}
                         activeVideoUrl={activeVideoUrl}
+                        onEntryStartRef={onEntryStartRef}
                     />
                 </Suspense>
             </Canvas>
 
-            <CardRuler
-                cards={cards}
-                currentIndex={currentIndex}
-                onSelect={goToCardIndex}
-            />
+            <RolodexNav cards={cards} currentIndex={currentIndex} onSelect={goToCardIndex} />
 
             <div className={styles.inspectUi}>
-                {cardData && <InfoPanel cardData={cardData} />}
                 {card?.hasAssets && (
                     <RemixGallery
                         cardId={card.id}

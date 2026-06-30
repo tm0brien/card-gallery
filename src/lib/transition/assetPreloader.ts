@@ -29,10 +29,7 @@ export function preloadCardAssets(cardId: string) {
     void preloadJson(`/assets/${cardId}/card-data.json`)
 }
 
-export function preloadAdjacentCardAssets(
-    cards: { id: string; hasAssets: boolean }[],
-    currentIndex: number
-) {
+export function preloadAdjacentCardAssets(cards: { id: string; hasAssets: boolean }[], currentIndex: number) {
     const indices = new Set([currentIndex, currentIndex - 1, currentIndex + 1])
     for (const index of indices) {
         const card = cards[index]

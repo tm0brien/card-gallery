@@ -1,17 +1,26 @@
-import { FlatCompat } from '@eslint/eslintrc'
-
-const compat = new FlatCompat({
-    baseDirectory: import.meta.dirname
-})
+import nextPlugin from '@next/eslint-plugin-next'
+import prettierRecommended from 'eslint-plugin-prettier/recommended'
+import simpleImportSort from 'eslint-plugin-simple-import-sort'
+import tseslint from 'typescript-eslint'
 
 const eslintConfig = [
-    ...compat.config({
-        extends: [
-            'plugin:@next/next/recommended',
-            'plugin:@typescript-eslint/recommended',
-            'plugin:prettier/recommended'
-        ],
-        plugins: ['simple-import-sort'],
+    {
+        ignores: ['.next/**', 'node_modules/**', 'out/**', 'public/**', 'next-env.d.ts']
+    },
+
+    // Next.js recommended rules (native flat config)
+    nextPlugin.configs.recommended,
+
+    // @typescript-eslint recommended (sets the TS parser + rules)
+    ...tseslint.configs.recommended,
+
+    // prettier-eslint integration (must come after other configs)
+    prettierRecommended,
+
+    {
+        plugins: {
+            'simple-import-sort': simpleImportSort
+        },
         rules: {
             // Prettier customization
             'prettier/prettier': [
@@ -42,7 +51,7 @@ const eslintConfig = [
             'simple-import-sort/imports': 'error',
             'simple-import-sort/exports': 'error'
         }
-    })
+    }
 ]
 
 export default eslintConfig

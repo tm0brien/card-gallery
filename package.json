@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "sync-cards": "tsx --env-file=.env.local scripts/sync-from-sheets.ts",
     "normalize-scans": "tsx scripts/normalize-card-scans.ts",
     "optimize-textures": "tsx scripts/optimize-textures.ts",

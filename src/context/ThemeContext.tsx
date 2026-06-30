@@ -1,16 +1,33 @@
 'use client'
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { defaultTheme, getTheme, ThemeConfig, ThemeMode } from '../config/theme'
+import { applyThemeOverride, ThemeOverrideEntry, ThemeOverridesMap } from '../config/themeOverrides'
 
 const STORAGE_KEY = 'card-gallery-theme'
+
+/** A transient, in-memory override scoped to a single theme mode, used by the
+ *  admin editor to preview unsaved changes live in the real viewer. */
+interface PreviewOverride {
+    mode: ThemeMode
+    entry: ThemeOverrideEntry
+}
 
 interface ThemeContextValue {
     theme: ThemeConfig
     themeMode: ThemeMode
     setThemeMode: (mode: ThemeMode) => void
     toggleTheme: () => void
+    /** The persisted per-theme overrides loaded from theme-overrides.json. */
+    savedOverrides: ThemeOverridesMap
+    /** Replace (or clear) the saved override for a mode after a successful save. */
+    setSavedOverride: (mode: ThemeMode, entry: ThemeOverrideEntry | null) => void
+    /** Set (or clear) the live preview override applied on top of the viewer. */
+    setPreviewOverride: (override: PreviewOverride | null) => void
+    /** Transient spotlight background color override for admin live preview. */
+    previewSpotlightColor: string | null
+    setPreviewSpotlightColor: (color: string | null) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
@@ -18,14 +35,31 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [themeMode, setThemeModeState] = useState<ThemeMode>(defaultTheme)
     const [mounted, setMounted] = useState(false)
+    const [overrides, setOverrides] = useState<ThemeOverridesMap>({})
+    const [previewOverride, setPreviewOverride] = useState<PreviewOverride | null>(null)
+    const [previewSpotlightColor, setPreviewSpotlightColor] = useState<string | null>(null)
 
     // Load saved theme preference on mount
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null
-        if (saved && (saved === 'gallery' || saved === 'study' || saved === 'night')) {
+        if (saved && (saved === 'gallery' || saved === 'study' || saved === 'night' || saved === 'spotlight')) {
             setThemeModeState(saved)
         }
         setMounted(true)
+    }, [])
+
+    // Load admin-authored lighting overrides (applied to the core experience).
+    useEffect(() => {
+        let cancelled = false
+        fetch('/data/theme-overrides.json')
+            .then(res => (res.ok ? res.json() : {}))
+            .then((data: ThemeOverridesMap) => {
+                if (!cancelled && data && typeof data === 'object') setOverrides(data)
+            })
+            .catch(() => undefined)
+        return () => {
+            cancelled = true
+        }
     }, [])
 
     const setThemeMode = useCallback((mode: ThemeMode) => {
@@ -33,13 +67,35 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY, mode)
     }, [])
 
-    // Cycle through themes: gallery -> study -> night -> gallery
+    const setSavedOverride = useCallback((mode: ThemeMode, entry: ThemeOverrideEntry | null) => {
+        setOverrides(prev => {
+            const next = { ...prev }
+            if (entry) next[mode] = entry
+            else delete next[mode]
+            return next
+        })
+    }, [])
+
+    // Cycle through themes: gallery -> study -> night -> spotlight -> gallery
     const toggleTheme = useCallback(() => {
-        const nextTheme: ThemeMode = themeMode === 'gallery' ? 'study' : themeMode === 'study' ? 'night' : 'gallery'
+        const nextTheme: ThemeMode =
+            themeMode === 'gallery'
+                ? 'study'
+                : themeMode === 'study'
+                  ? 'night'
+                  : themeMode === 'night'
+                    ? 'spotlight'
+                    : 'gallery'
         setThemeMode(nextTheme)
     }, [themeMode, setThemeMode])
 
-    const theme = getTheme(themeMode)
+    const theme = useMemo(() => {
+        // A live preview override (admin editor) wins, but only for the mode it
+        // was authored against — so switching themes never bleeds stale edits.
+        const effective =
+            previewOverride && previewOverride.mode === themeMode ? previewOverride.entry : overrides[themeMode]
+        return applyThemeOverride(getTheme(themeMode), effective)
+    }, [themeMode, overrides, previewOverride])
 
     // Apply CSS custom properties for the current theme
     useEffect(() => {
@@ -94,7 +150,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }, [theme, themeMode, mounted])
 
     return (
-        <ThemeContext.Provider value={{ theme, themeMode, setThemeMode, toggleTheme }}>
+        <ThemeContext.Provider
+            value={{
+                theme,
+                themeMode,
+                setThemeMode,
+                toggleTheme,
+                savedOverrides: overrides,
+                setSavedOverride,
+                setPreviewOverride,
+                previewSpotlightColor,
+                setPreviewSpotlightColor
+            }}
+        >
             {children}
         </ThemeContext.Provider>
     )

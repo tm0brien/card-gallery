@@ -14,10 +14,10 @@ import styles from '../styles/DebugPanel.module.css'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface LightOverride {
-    azimuth: number    // radians, –π to π (horizontal angle around Y axis)
-    elevation: number  // radians, 0 to ~π/2 (angle above horizontal)
+    azimuth: number // radians, –π to π (horizontal angle around Y axis)
+    elevation: number // radians, 0 to ~π/2 (angle above horizontal)
     intensity: number
-    kelvin: number     // color temperature in Kelvin
+    kelvin: number // color temperature in Kelvin
 }
 
 export interface DebugOverrides {
@@ -40,6 +40,7 @@ export interface DebugOverrides {
     lightformerTopIntensity: number
     lightformerRimIntensity: number
     lightformerFillIntensity: number
+    lightformerFrontIntensity: number
     // Material
     clearcoat: number
     clearcoatRoughness: number
@@ -55,11 +56,7 @@ export interface DebugOverrides {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function sphericalToXyz(az: number, el: number, r = 10): [number, number, number] {
-    return [
-        r * Math.cos(el) * Math.sin(az),
-        r * Math.sin(el),
-        r * Math.cos(el) * Math.cos(az),
-    ]
+    return [r * Math.cos(el) * Math.sin(az), r * Math.sin(el), r * Math.cos(el) * Math.cos(az)]
 }
 
 function xyzToSpherical([x, y, z]: [number, number, number]) {
@@ -67,7 +64,7 @@ function xyzToSpherical([x, y, z]: [number, number, number]) {
     return {
         az: Math.atan2(x, z),
         el: Math.atan2(y, Math.sqrt(x * x + z * z)),
-        r,
+        r
     }
 }
 
@@ -87,29 +84,29 @@ export function kelvinToHex(kelvin: number): string {
     return `#${h(r)}${h(g)}${h(b)}`
 }
 
-function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)) }
-function h(v: number) { return Math.round(v).toString(16).padStart(2, '0') }
+function clamp(v: number, lo: number, hi: number) {
+    return Math.max(lo, Math.min(hi, v))
+}
+function h(v: number) {
+    return Math.round(v).toString(16).padStart(2, '0')
+}
 
 function hexToKelvin(color: string): number {
     const r = parseInt(color.slice(1, 3), 16)
     const b = parseInt(color.slice(5, 7), 16)
     if (isNaN(r) || isNaN(b)) return 6500
-    if (r > 250 && b > 240) return 6500   // near-white
-    if (r > 240 && b < 200) return 3500   // warm amber
-    if (b > 240 && r < 210) return 9000   // cool blue
+    if (r > 250 && b > 240) return 6500 // near-white
+    if (r > 240 && b < 200) return 3500 // warm amber
+    if (b > 240 && r < 210) return 9000 // cool blue
     return 6500
 }
 
-function makeLightOverride(
-    pos: [number, number, number],
-    intensity: number,
-    color: string,
-): LightOverride {
+function makeLightOverride(pos: [number, number, number], intensity: number, color: string): LightOverride {
     const { az, el } = xyzToSpherical(pos)
     return { azimuth: az, elevation: el, intensity, kelvin: hexToKelvin(color) }
 }
 
-function themeToOverrides(theme: ThemeConfig): DebugOverrides {
+export function themeToOverrides(theme: ThemeConfig): DebugOverrides {
     const { lighting: l, atmosphere: a, material: m, motion: mo } = theme
     return {
         ambientIntensity: l.ambientIntensity,
@@ -129,12 +126,13 @@ function themeToOverrides(theme: ThemeConfig): DebugOverrides {
         lightformerTopIntensity: a.lightformerTopIntensity,
         lightformerRimIntensity: a.lightformerRimIntensity,
         lightformerFillIntensity: a.lightformerFillIntensity,
+        lightformerFrontIntensity: a.lightformerFrontIntensity,
         clearcoat: m.clearcoat,
         clearcoatRoughness: m.clearcoatRoughness,
         roughness: m.roughness,
         envMapIntensity: m.envMapIntensity,
         cursorTiltStrength: mo.cursorTiltStrength,
-        presentationTilt: mo.presentationTilt,
+        presentationTilt: mo.presentationTilt
     }
 }
 
@@ -142,10 +140,7 @@ function themeToOverrides(theme: ThemeConfig): DebugOverrides {
 // Canvas helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-function roundRectPath(
-    ctx: CanvasRenderingContext2D,
-    x: number, y: number, w: number, h: number, r: number,
-) {
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
     ctx.beginPath()
     ctx.moveTo(x + r, y)
     ctx.arcTo(x + w, y, x + w, y + h, r)
@@ -161,14 +156,14 @@ function roundRectPath(
 
 const PAD_W = 100
 const PAD_H = 76
-const EL_MIN = -Math.PI / 12   // −15°
-const EL_MAX = Math.PI / 2      // 90°
+const EL_MIN = -Math.PI / 12 // −15°
+const EL_MAX = Math.PI / 2 // 90°
 const EL_RANGE = EL_MAX - EL_MIN
 
 const LIGHT_ACCENT: Record<string, string> = {
     key: '#f59e0b',
     fill: '#38bdf8',
-    rim: '#a78bfa',
+    rim: '#a78bfa'
 }
 
 interface LightPadProps {
@@ -214,19 +209,23 @@ function LightPad({ azimuth, elevation, accentColor, onChange }: LightPadProps) 
         ctx.strokeStyle = 'rgba(255,255,255,0.1)'
         ctx.lineWidth = 0.5
         ctx.beginPath()
-        ctx.moveTo(PAD_W / 2, 3); ctx.lineTo(PAD_W / 2, PAD_H - 3)
-        ctx.moveTo(3, PAD_H / 2); ctx.lineTo(PAD_W - 3, PAD_H / 2)
+        ctx.moveTo(PAD_W / 2, 3)
+        ctx.lineTo(PAD_W / 2, PAD_H - 3)
+        ctx.moveTo(3, PAD_H / 2)
+        ctx.lineTo(PAD_W - 3, PAD_H / 2)
         ctx.stroke()
         ctx.setLineDash([])
 
         // Corner labels
         ctx.fillStyle = 'rgba(255,255,255,0.2)'
         ctx.font = '7.5px system-ui, sans-serif'
-        ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
         ctx.fillText('L', 4, 4)
         ctx.textAlign = 'right'
         ctx.fillText('R', PAD_W - 4, 4)
-        ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'bottom'
         ctx.fillText('low', 4, PAD_H - 4)
         ctx.textAlign = 'right'
         ctx.fillText('high', PAD_W - 4, PAD_H - 4)
@@ -256,31 +255,42 @@ function LightPad({ azimuth, elevation, accentColor, onChange }: LightPadProps) 
         ctx.fill()
     }, [azimuth, elevation, accentColor])
 
-    useEffect(() => { draw() }, [draw])
+    useEffect(() => {
+        draw()
+    }, [draw])
 
-    const readPointer = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        const nx = clamp((e.clientX - rect.left) / rect.width, 0, 1)
-        const ny = clamp((e.clientY - rect.top) / rect.height, 0, 1)
-        onChange(
-            clamp(nx * 2 * Math.PI - Math.PI, -Math.PI, Math.PI),
-            clamp(EL_MIN + (1 - ny) * EL_RANGE, EL_MIN, EL_MAX),
-        )
-    }, [onChange])
+    const readPointer = useCallback(
+        (e: React.PointerEvent<HTMLCanvasElement>) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const nx = clamp((e.clientX - rect.left) / rect.width, 0, 1)
+            const ny = clamp((e.clientY - rect.top) / rect.height, 0, 1)
+            onChange(
+                clamp(nx * 2 * Math.PI - Math.PI, -Math.PI, Math.PI),
+                clamp(EL_MIN + (1 - ny) * EL_RANGE, EL_MIN, EL_MAX)
+            )
+        },
+        [onChange]
+    )
 
     return (
         <canvas
             ref={canvasRef}
             className={styles.lightPad}
             style={{ width: PAD_W, height: PAD_H }}
-            onPointerDown={(e) => {
+            onPointerDown={e => {
                 dragging.current = true
                 e.currentTarget.setPointerCapture(e.pointerId)
                 readPointer(e)
             }}
-            onPointerMove={(e) => { if (dragging.current) readPointer(e) }}
-            onPointerUp={() => { dragging.current = false }}
-            onPointerCancel={() => { dragging.current = false }}
+            onPointerMove={e => {
+                if (dragging.current) readPointer(e)
+            }}
+            onPointerUp={() => {
+                dragging.current = false
+            }}
+            onPointerCancel={() => {
+                dragging.current = false
+            }}
         />
     )
 }
@@ -316,10 +326,20 @@ function TempStrip({ kelvin, onChange }: { kelvin: number; onChange: (k: number)
         <div
             className={styles.tempStrip}
             style={{ background: TEMP_GRADIENT }}
-            onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); readPointer(e) }}
-            onPointerMove={(e) => { if (dragging.current) readPointer(e) }}
-            onPointerUp={() => { dragging.current = false }}
-            onPointerCancel={() => { dragging.current = false }}
+            onPointerDown={e => {
+                dragging.current = true
+                e.currentTarget.setPointerCapture(e.pointerId)
+                readPointer(e)
+            }}
+            onPointerMove={e => {
+                if (dragging.current) readPointer(e)
+            }}
+            onPointerUp={() => {
+                dragging.current = false
+            }}
+            onPointerCancel={() => {
+                dragging.current = false
+            }}
         >
             <div className={styles.tempTick} style={{ left: `${tickPct}%` }} />
         </div>
@@ -333,9 +353,12 @@ function TempStrip({ kelvin, onChange }: { kelvin: number; onChange: (k: number)
 const RIG_W = 312
 const RIG_H = 124
 
-interface RigLight { name: string; override: LightOverride }
+export interface RigLight {
+    name: string
+    override: LightOverride
+}
 
-function LightRig({ lights }: { lights: RigLight[] }) {
+export function LightRig({ lights }: { lights: RigLight[] }) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
 
     useLayoutEffect(() => {
@@ -380,13 +403,15 @@ function LightRig({ lights }: { lights: RigLight[] }) {
         // Labels
         ctx.font = '7.5px system-ui, sans-serif'
         ctx.fillStyle = 'rgba(255,255,255,0.18)'
-        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
         ctx.fillText('viewer / front', cx, RIG_H - 5)
         ctx.textBaseline = 'top'
         ctx.fillText('back', cx, 6)
 
         // Card rectangle
-        const cw = 16, ch = 24
+        const cw = 16,
+            ch = 24
         ctx.fillStyle = 'rgba(255,255,255,0.1)'
         ctx.fillRect(cx - cw / 2, cy - ch / 2, cw, ch)
         ctx.strokeStyle = 'rgba(255,255,255,0.28)'
@@ -434,25 +459,21 @@ function LightRig({ lights }: { lights: RigLight[] }) {
         }
     }, [lights])
 
-    useEffect(() => { draw() }, [draw])
+    useEffect(() => {
+        draw()
+    }, [draw])
 
-    return (
-        <canvas
-            ref={canvasRef}
-            className={styles.lightRig}
-            style={{ width: RIG_W, height: RIG_H }}
-        />
-    )
+    return <canvas ref={canvasRef} className={styles.lightRig} style={{ width: RIG_W, height: RIG_H }} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LightRow — one directional light: pad + intensity + temperature
 // ─────────────────────────────────────────────────────────────────────────────
 
-function LightRow({
+export function LightRow({
     name,
     override: lo,
-    onChange,
+    onChange
 }: {
     name: string
     override: LightOverride
@@ -467,7 +488,9 @@ function LightRow({
             <div className={styles.lightLabel}>
                 <span className={styles.lightDot} style={{ background: color }} />
                 <span>{name.toUpperCase()}</span>
-                <span className={styles.lightAngles}>{azDeg}° az · {elDeg}° el</span>
+                <span className={styles.lightAngles}>
+                    {azDeg}° az · {elDeg}° el
+                </span>
                 <span className={styles.lightKelvin} style={{ color: kelvinToHex(lo.kelvin) }}>
                     {Math.round(lo.kelvin)}K
                 </span>
@@ -485,18 +508,17 @@ function LightRow({
                         <input
                             type="range"
                             className={styles.sliderInput}
-                            min={0} max={2} step={0.01}
+                            min={0}
+                            max={2}
+                            step={0.01}
                             value={lo.intensity}
-                            onChange={(e) => onChange({ ...lo, intensity: parseFloat(e.target.value) })}
+                            onChange={e => onChange({ ...lo, intensity: parseFloat(e.target.value) })}
                         />
                         <span className={styles.sliderValue}>{lo.intensity.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
-            <TempStrip
-                kelvin={lo.kelvin}
-                onChange={(k) => onChange({ ...lo, kelvin: k })}
-            />
+            <TempStrip kelvin={lo.kelvin} onChange={k => onChange({ ...lo, kelvin: k })} />
         </div>
     )
 }
@@ -505,11 +527,22 @@ function LightRow({
 // Slider + Section helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Slider({
-    label, value, min, max, step, onChange, format,
+export function Slider({
+    label,
+    value,
+    min,
+    max,
+    step,
+    onChange,
+    format
 }: {
-    label: string; value: number; min: number; max: number; step: number
-    onChange: (v: number) => void; format?: (v: number) => string
+    label: string
+    value: number
+    min: number
+    max: number
+    step: number
+    onChange: (v: number) => void
+    format?: (v: number) => string
 }) {
     const fmt = format ?? ((v: number) => v.toFixed(step < 0.01 ? 4 : step < 0.1 ? 3 : 2))
     return (
@@ -518,8 +551,11 @@ function Slider({
             <input
                 type="range"
                 className={styles.sliderInput}
-                min={min} max={max} step={step} value={value}
-                onChange={(e) => onChange(parseFloat(e.target.value))}
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={e => onChange(parseFloat(e.target.value))}
             />
             <span className={styles.sliderValue}>{fmt(value)}</span>
         </div>
@@ -558,22 +594,21 @@ export default function DebugPanel({ theme, onOverridesChange }: DebugPanelProps
     // Toggle with backtick
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if (e.key === '`' && !e.metaKey && !e.ctrlKey) setVisible((v) => !v)
+            if (e.key === '`' && !e.metaKey && !e.ctrlKey) setVisible(v => !v)
         }
         window.addEventListener('keydown', handler)
         return () => window.removeEventListener('keydown', handler)
     }, [])
 
     const set = <K extends keyof DebugOverrides>(key: K, value: DebugOverrides[K]) => {
-        setOverrides((prev) => {
+        setOverrides(prev => {
             const next = { ...prev, [key]: value }
             onOverridesChange(next)
             return next
         })
     }
 
-    const setNum = (key: keyof DebugOverrides, value: number) =>
-        set(key, value as DebugOverrides[typeof key])
+    const setNum = (key: keyof DebugOverrides, value: number) => set(key, value as DebugOverrides[typeof key])
 
     const setLight = (name: 'key' | 'fill' | 'rim', value: LightOverride) => set(name, value)
 
@@ -591,7 +626,7 @@ export default function DebugPanel({ theme, onOverridesChange }: DebugPanelProps
             fillPosition: sphericalToXyz(f.azimuth, f.elevation, 10),
             rimIntensity: ri.intensity,
             rimColor: kelvinToHex(ri.kelvin),
-            rimPosition: sphericalToXyz(ri.azimuth, ri.elevation, 10),
+            rimPosition: sphericalToXyz(ri.azimuth, ri.elevation, 10)
         }
 
         const atmosphereOut: Partial<AtmosphereConfig> = {
@@ -604,19 +639,19 @@ export default function DebugPanel({ theme, onOverridesChange }: DebugPanelProps
             grainIntensity: overrides.grainIntensity,
             dofBokehScale: overrides.dofBokehScale,
             toneMappingExposure: overrides.toneMappingExposure,
-            envIntensity: overrides.envIntensity,
+            envIntensity: overrides.envIntensity
         }
 
         const materialOut: Partial<MaterialConfig> = {
             clearcoat: overrides.clearcoat,
             clearcoatRoughness: overrides.clearcoatRoughness,
             roughness: overrides.roughness,
-            envMapIntensity: overrides.envMapIntensity,
+            envMapIntensity: overrides.envMapIntensity
         }
 
         const motionOut: Partial<MotionConfig> = {
             cursorTiltStrength: overrides.cursorTiltStrength,
-            presentationTilt: overrides.presentationTilt,
+            presentationTilt: overrides.presentationTilt
         }
 
         const text = [
@@ -624,7 +659,7 @@ export default function DebugPanel({ theme, onOverridesChange }: DebugPanelProps
             `lighting: ${JSON.stringify(lightingOut, null, 2)}`,
             `\natmosphere: ${JSON.stringify(atmosphereOut, null, 2)}`,
             `\nmaterial: ${JSON.stringify(materialOut, null, 2)}`,
-            `\nmotion: ${JSON.stringify(motionOut, null, 2)}`,
+            `\nmotion: ${JSON.stringify(motionOut, null, 2)}`
         ].join('\n')
 
         navigator.clipboard.writeText(text).then(() => {
@@ -639,19 +674,18 @@ export default function DebugPanel({ theme, onOverridesChange }: DebugPanelProps
         onOverridesChange(next)
     }
 
-    const rigLights = useMemo(() => [
-        { name: 'key', override: overrides.key },
-        { name: 'fill', override: overrides.fill },
-        { name: 'rim', override: overrides.rim },
-    ], [overrides.key, overrides.fill, overrides.rim])
+    const rigLights = useMemo(
+        () => [
+            { name: 'key', override: overrides.key },
+            { name: 'fill', override: overrides.fill },
+            { name: 'rim', override: overrides.rim }
+        ],
+        [overrides.key, overrides.fill, overrides.rim]
+    )
 
     if (!visible) {
         return (
-            <button
-                className={styles.toggle}
-                onClick={() => setVisible(true)}
-                title="Open debug panel (` key)"
-            >
+            <button className={styles.toggle} onClick={() => setVisible(true)} title="Open debug panel (` key)">
                 ⚙
             </button>
         )
@@ -662,63 +696,210 @@ export default function DebugPanel({ theme, onOverridesChange }: DebugPanelProps
             <div className={styles.header}>
                 <span className={styles.headerTitle}>Debug — {theme.name}</span>
                 <div className={styles.headerActions}>
-                    <button className={styles.actionBtn} onClick={handleReset}>Reset</button>
+                    <button className={styles.actionBtn} onClick={handleReset}>
+                        Reset
+                    </button>
                     <button
                         className={`${styles.actionBtn} ${copied ? styles.actionBtnSuccess : ''}`}
                         onClick={handleCopy}
                     >
                         {copied ? 'Copied!' : 'Copy values'}
                     </button>
-                    <button className={styles.closeBtn} onClick={() => setVisible(false)}>✕</button>
+                    <button className={styles.closeBtn} onClick={() => setVisible(false)}>
+                        ✕
+                    </button>
                 </div>
             </div>
 
             <div className={styles.body}>
-
                 {/* ── LIGHTING ── */}
                 <Section title="LIGHTING" />
                 <LightRig lights={rigLights} />
                 <Slider
                     label="ambient"
                     value={overrides.ambientIntensity}
-                    min={0} max={2} step={0.01}
-                    onChange={(v) => setNum('ambientIntensity', v)}
+                    min={0}
+                    max={2}
+                    step={0.01}
+                    onChange={v => setNum('ambientIntensity', v)}
                 />
-                <LightRow name="key" override={overrides.key} onChange={(v) => setLight('key', v)} />
-                <LightRow name="fill" override={overrides.fill} onChange={(v) => setLight('fill', v)} />
-                <LightRow name="rim" override={overrides.rim} onChange={(v) => setLight('rim', v)} />
+                <LightRow name="key" override={overrides.key} onChange={v => setLight('key', v)} />
+                <LightRow name="fill" override={overrides.fill} onChange={v => setLight('fill', v)} />
+                <LightRow name="rim" override={overrides.rim} onChange={v => setLight('rim', v)} />
 
                 {/* ── MATERIAL ── */}
                 <Section title="MATERIAL" />
-                <Slider label="clearcoat" value={overrides.clearcoat} min={0} max={1} step={0.01} onChange={(v) => setNum('clearcoat', v)} />
-                <Slider label="clearcoat roughness" value={overrides.clearcoatRoughness} min={0} max={1} step={0.01} onChange={(v) => setNum('clearcoatRoughness', v)} />
-                <Slider label="roughness" value={overrides.roughness} min={0} max={1} step={0.01} onChange={(v) => setNum('roughness', v)} />
-                <Slider label="env map intensity" value={overrides.envMapIntensity} min={0} max={0.5} step={0.01} onChange={(v) => setNum('envMapIntensity', v)} />
+                <Slider
+                    label="clearcoat"
+                    value={overrides.clearcoat}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('clearcoat', v)}
+                />
+                <Slider
+                    label="clearcoat roughness"
+                    value={overrides.clearcoatRoughness}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('clearcoatRoughness', v)}
+                />
+                <Slider
+                    label="roughness"
+                    value={overrides.roughness}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('roughness', v)}
+                />
+                <Slider
+                    label="env map intensity"
+                    value={overrides.envMapIntensity}
+                    min={0}
+                    max={0.5}
+                    step={0.01}
+                    onChange={v => setNum('envMapIntensity', v)}
+                />
 
                 {/* ── POST-PROCESSING ── */}
                 <Section title="POST-PROCESSING" />
-                <Slider label="exposure" value={overrides.toneMappingExposure} min={0.5} max={2} step={0.01} onChange={(v) => setNum('toneMappingExposure', v)} />
-                <Slider label="bloom strength" value={overrides.bloomStrength} min={0} max={1} step={0.01} onChange={(v) => setNum('bloomStrength', v)} />
-                <Slider label="bloom threshold" value={overrides.bloomThreshold} min={0.5} max={1} step={0.01} onChange={(v) => setNum('bloomThreshold', v)} />
-                <Slider label="vignette offset" value={overrides.vignetteOffset} min={0} max={1} step={0.01} onChange={(v) => setNum('vignetteOffset', v)} />
-                <Slider label="vignette darkness" value={overrides.vignetteDarkness} min={0} max={1} step={0.01} onChange={(v) => setNum('vignetteDarkness', v)} />
-                <Slider label="saturation" value={overrides.saturation} min={-0.5} max={0.5} step={0.01} onChange={(v) => setNum('saturation', v)} />
-                <Slider label="grain" value={overrides.grainIntensity} min={0} max={0.1} step={0.001} onChange={(v) => setNum('grainIntensity', v)} format={(v) => v.toFixed(3)} />
-                <Slider label="chromatic aberration" value={overrides.chromaticAberration} min={0} max={0.003} step={0.0001} onChange={(v) => setNum('chromaticAberration', v)} format={(v) => v.toFixed(4)} />
-                <Slider label="dof bokeh (browse)" value={overrides.dofBokehScale} min={0} max={10} step={0.1} onChange={(v) => setNum('dofBokehScale', v)} />
+                <Slider
+                    label="exposure"
+                    value={overrides.toneMappingExposure}
+                    min={0.5}
+                    max={2}
+                    step={0.01}
+                    onChange={v => setNum('toneMappingExposure', v)}
+                />
+                <Slider
+                    label="bloom strength"
+                    value={overrides.bloomStrength}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('bloomStrength', v)}
+                />
+                <Slider
+                    label="bloom threshold"
+                    value={overrides.bloomThreshold}
+                    min={0.5}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('bloomThreshold', v)}
+                />
+                <Slider
+                    label="vignette offset"
+                    value={overrides.vignetteOffset}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('vignetteOffset', v)}
+                />
+                <Slider
+                    label="vignette darkness"
+                    value={overrides.vignetteDarkness}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={v => setNum('vignetteDarkness', v)}
+                />
+                <Slider
+                    label="saturation"
+                    value={overrides.saturation}
+                    min={-0.5}
+                    max={0.5}
+                    step={0.01}
+                    onChange={v => setNum('saturation', v)}
+                />
+                <Slider
+                    label="grain"
+                    value={overrides.grainIntensity}
+                    min={0}
+                    max={0.1}
+                    step={0.001}
+                    onChange={v => setNum('grainIntensity', v)}
+                    format={v => v.toFixed(3)}
+                />
+                <Slider
+                    label="chromatic aberration"
+                    value={overrides.chromaticAberration}
+                    min={0}
+                    max={0.003}
+                    step={0.0001}
+                    onChange={v => setNum('chromaticAberration', v)}
+                    format={v => v.toFixed(4)}
+                />
+                <Slider
+                    label="dof bokeh (browse)"
+                    value={overrides.dofBokehScale}
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    onChange={v => setNum('dofBokehScale', v)}
+                />
 
                 {/* ── ENVIRONMENT (baked — copy to theme.ts) ── */}
                 <Section title="ENVIRONMENT (baked at mount)" />
-                <Slider label="env intensity" value={overrides.envIntensity} min={0} max={0.5} step={0.01} onChange={(v) => setNum('envIntensity', v)} />
-                <Slider label="lightformer top" value={overrides.lightformerTopIntensity} min={0} max={8} step={0.1} onChange={(v) => setNum('lightformerTopIntensity', v)} />
-                <Slider label="lightformer rim" value={overrides.lightformerRimIntensity} min={0} max={5} step={0.1} onChange={(v) => setNum('lightformerRimIntensity', v)} />
-                <Slider label="lightformer fill" value={overrides.lightformerFillIntensity} min={0} max={3} step={0.1} onChange={(v) => setNum('lightformerFillIntensity', v)} />
+                <Slider
+                    label="env intensity"
+                    value={overrides.envIntensity}
+                    min={0}
+                    max={0.5}
+                    step={0.01}
+                    onChange={v => setNum('envIntensity', v)}
+                />
+                <Slider
+                    label="lightformer top"
+                    value={overrides.lightformerTopIntensity}
+                    min={0}
+                    max={8}
+                    step={0.1}
+                    onChange={v => setNum('lightformerTopIntensity', v)}
+                />
+                <Slider
+                    label="lightformer rim"
+                    value={overrides.lightformerRimIntensity}
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    onChange={v => setNum('lightformerRimIntensity', v)}
+                />
+                <Slider
+                    label="lightformer fill"
+                    value={overrides.lightformerFillIntensity}
+                    min={0}
+                    max={3}
+                    step={0.1}
+                    onChange={v => setNum('lightformerFillIntensity', v)}
+                />
+                <Slider
+                    label="lightformer front"
+                    value={overrides.lightformerFrontIntensity}
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    onChange={v => setNum('lightformerFrontIntensity', v)}
+                />
 
                 {/* ── INTERACTION ── */}
                 <Section title="INTERACTION" />
-                <Slider label="cursor tilt strength" value={overrides.cursorTiltStrength} min={0} max={10} step={0.1} onChange={(v) => setNum('cursorTiltStrength', v)} />
-                <Slider label="presentation tilt°" value={overrides.presentationTilt} min={0} max={40} step={0.5} onChange={(v) => setNum('presentationTilt', v)} />
-
+                <Slider
+                    label="cursor tilt strength"
+                    value={overrides.cursorTiltStrength}
+                    min={0}
+                    max={10}
+                    step={0.1}
+                    onChange={v => setNum('cursorTiltStrength', v)}
+                />
+                <Slider
+                    label="presentation tilt°"
+                    value={overrides.presentationTilt}
+                    min={0}
+                    max={40}
+                    step={0.5}
+                    onChange={v => setNum('presentationTilt', v)}
+                />
             </div>
 
             <div className={styles.footer}>

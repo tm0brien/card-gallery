@@ -9,12 +9,11 @@ export function calculateFitDistance(
     objectHeight: number,
     fov: number,
     aspect: number,
-    padding: number,
+    padding: number
 ) {
     const fovRad = (fov * Math.PI) / 180
     const distanceForHeight = objectHeight / 2 / Math.tan(fovRad / 2)
-    const distanceForWidth =
-        objectWidth / 2 / (Math.tan(fovRad / 2) * aspect)
+    const distanceForWidth = objectWidth / 2 / (Math.tan(fovRad / 2) * aspect)
 
     return Math.max(Math.max(distanceForHeight, distanceForWidth) * padding, MIN_DISTANCE)
 }

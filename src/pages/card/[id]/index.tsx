@@ -1,7 +1,6 @@
+import type { GetServerSideProps } from 'next'
 import dynamic from 'next/dynamic'
 import Head from 'next/head'
-
-import type { GetServerSideProps } from 'next'
 
 import { getCards } from '../../../lib/cards'
 import { filterViewableCards } from '../../../lib/viewableCards'
@@ -27,20 +26,17 @@ function buildDescription(card: CardSummary): string {
     return line
 }
 
-export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
-    ctx,
-) => {
+export const getServerSideProps: GetServerSideProps<CardPageProps> = async ctx => {
     const id = ctx.params?.id as string
     const manifest = await getCards()
     const cards = filterViewableCards(manifest.cards)
-    const card = cards.find((c) => c.id === id)
+    const card = cards.find(c => c.id === id)
 
     if (!card) {
         return { notFound: true }
     }
 
-    const protocol =
-        (ctx.req.headers['x-forwarded-proto'] as string) || 'http'
+    const protocol = (ctx.req.headers['x-forwarded-proto'] as string) || 'http'
     const host = ctx.req.headers.host || 'localhost:3000'
     const baseUrl = `${protocol}://${host}`
 
@@ -49,17 +45,12 @@ export const getServerSideProps: GetServerSideProps<CardPageProps> = async (
             card,
             cards,
             baseUrl,
-            ogDescription: buildDescription(card),
-        },
+            ogDescription: buildDescription(card)
+        }
     }
 }
 
-export default function CardPage({
-    card,
-    cards,
-    baseUrl,
-    ogDescription,
-}: CardPageProps) {
+export default function CardPage({ card, cards, baseUrl, ogDescription }: CardPageProps) {
     const ogImageUrl = `${baseUrl}/api/og/${card.id}`
     const cardUrl = `${baseUrl}/card/${card.id}`
 

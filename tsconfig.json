@@ -16,7 +16,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "baseUrl": "src",
     "plugins": [
       {
         "name": "next"
@@ -24,7 +23,7 @@
     ],
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
     },
     "target": "ES2017"

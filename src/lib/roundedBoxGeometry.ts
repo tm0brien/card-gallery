@@ -32,7 +32,7 @@ export function createRoundedBoxGeometry(
         steps: 1,
         bevelSize: radius - EPS,
         bevelThickness: radius,
-        curveSegments: smoothness,
+        curveSegments: smoothness
     })
 
     extruded.center()
@@ -111,13 +111,33 @@ export function createRoundedBoxGeometry(
             let fu: number
             let fv: number
             switch (g) {
-                case 0: fu = (hd - pz) / depth;  fv = (py + hh) / height; break
-                case 1: fu = (pz + hd) / depth;  fv = (py + hh) / height; break
-                case 2: fu = (px + hw) / width;  fv = (hd - pz) / depth;  break
-                case 3: fu = (px + hw) / width;  fv = (pz + hd) / depth;  break
-                case 4: fu = (px + hw) / width;  fv = (py + hh) / height; break
-                case 5: fu = (hw - px) / width;  fv = (py + hh) / height; break
-                default: fu = 0; fv = 0
+                case 0:
+                    fu = (hd - pz) / depth
+                    fv = (py + hh) / height
+                    break
+                case 1:
+                    fu = (pz + hd) / depth
+                    fv = (py + hh) / height
+                    break
+                case 2:
+                    fu = (px + hw) / width
+                    fv = (hd - pz) / depth
+                    break
+                case 3:
+                    fu = (px + hw) / width
+                    fv = (pz + hd) / depth
+                    break
+                case 4:
+                    fu = (px + hw) / width
+                    fv = (py + hh) / height
+                    break
+                case 5:
+                    fu = (hw - px) / width
+                    fv = (py + hh) / height
+                    break
+                default:
+                    fu = 0
+                    fv = 0
             }
             newUV[di * 2] = clamp01(fu)
             newUV[di * 2 + 1] = clamp01(fv)

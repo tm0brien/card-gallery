@@ -1,11 +1,9 @@
 import fs from 'fs'
-import path from 'path'
-
+import type { GetServerSideProps } from 'next'
 import Head from 'next/head'
 import Link from 'next/link'
+import path from 'path'
 import { useEffect, useState } from 'react'
-
-import type { GetServerSideProps } from 'next'
 
 import { getCards } from '../../../lib/cards'
 import styles from '../../../styles/OgPreview.module.css'
@@ -28,26 +26,21 @@ function buildDescription(card: CardSummary): string {
     return line
 }
 
-export const getServerSideProps: GetServerSideProps<OgPreviewProps> = async (
-    ctx,
-) => {
+export const getServerSideProps: GetServerSideProps<OgPreviewProps> = async ctx => {
     const id = ctx.params?.id as string
     const manifest = await getCards()
-    const card = manifest.cards.find((c) => c.id === id)
+    const card = manifest.cards.find(c => c.id === id)
 
     if (!card) {
         return { redirect: { destination: '/', permanent: false } }
     }
 
-    const frontExists = fs.existsSync(
-        path.join(process.cwd(), 'public', 'assets', id, 'front.png'),
-    )
+    const frontExists = fs.existsSync(path.join(process.cwd(), 'public', 'assets', id, 'front.png'))
     if (!frontExists) {
         return { redirect: { destination: '/', permanent: false } }
     }
 
-    const protocol =
-        (ctx.req.headers['x-forwarded-proto'] as string) || 'http'
+    const protocol = (ctx.req.headers['x-forwarded-proto'] as string) || 'http'
     const host = ctx.req.headers.host || 'localhost:3000'
     const baseUrl = `${protocol}://${host}`
 
@@ -55,16 +48,12 @@ export const getServerSideProps: GetServerSideProps<OgPreviewProps> = async (
         props: {
             card,
             baseUrl,
-            ogDescription: buildDescription(card),
-        },
+            ogDescription: buildDescription(card)
+        }
     }
 }
 
-export default function OgPreviewPage({
-    card,
-    baseUrl,
-    ogDescription,
-}: OgPreviewProps) {
+export default function OgPreviewPage({ card, baseUrl, ogDescription }: OgPreviewProps) {
     const [refreshKey, setRefreshKey] = useState(0)
     const ogImageUrl = `/api/og/${card.id}?v=${refreshKey}`
     const ogImageAbsolute = `${baseUrl}/api/og/${card.id}`
@@ -90,19 +79,13 @@ export default function OgPreviewPage({
                     {/* Header */}
                     <div className={styles.header}>
                         <div>
-                            <Link
-                                href={`/card/${card.id}`}
-                                className={styles.backLink}
-                            >
+                            <Link href={`/card/${card.id}`} className={styles.backLink}>
                                 ← Back to card
                             </Link>
                             <h1 className={styles.title}>{card.title}</h1>
                         </div>
                         <div className={styles.actions}>
-                            <button
-                                className={styles.refreshBtn}
-                                onClick={() => setRefreshKey((k) => k + 1)}
-                            >
+                            <button className={styles.refreshBtn} onClick={() => setRefreshKey(k => k + 1)}>
                                 ↻ Refresh
                             </button>
                         </div>
@@ -113,22 +96,11 @@ export default function OgPreviewPage({
                         <div className={styles.sectionLabel}>Twitter / X</div>
                         <div className={styles.twitterFrame}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                key={refreshKey}
-                                src={ogImageUrl}
-                                alt="OG Preview"
-                                className={styles.twitterImage}
-                            />
+                            <img key={refreshKey} src={ogImageUrl} alt="OG Preview" className={styles.twitterImage} />
                             <div className={styles.twitterBody}>
-                                <div className={styles.twitterDomain}>
-                                    {domain}
-                                </div>
-                                <div className={styles.twitterTitle}>
-                                    {card.title}
-                                </div>
-                                <div className={styles.twitterDesc}>
-                                    {ogDescription}
-                                </div>
+                                <div className={styles.twitterDomain}>{domain}</div>
+                                <div className={styles.twitterTitle}>{card.title}</div>
+                                <div className={styles.twitterDesc}>{ogDescription}</div>
                             </div>
                         </div>
                     </div>
@@ -138,35 +110,19 @@ export default function OgPreviewPage({
                         <div className={styles.sectionLabel}>iMessage</div>
                         <div className={styles.imessageFrame}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                key={refreshKey}
-                                src={ogImageUrl}
-                                alt="OG Preview"
-                                className={styles.imessageImage}
-                            />
+                            <img key={refreshKey} src={ogImageUrl} alt="OG Preview" className={styles.imessageImage} />
                             <div className={styles.imessageBody}>
-                                <div className={styles.imessageTitle}>
-                                    {card.title}
-                                </div>
-                                <div className={styles.imessageDomain}>
-                                    {domain}
-                                </div>
+                                <div className={styles.imessageTitle}>{card.title}</div>
+                                <div className={styles.imessageDomain}>{domain}</div>
                             </div>
                         </div>
                     </div>
 
                     {/* Raw 1200×630 */}
                     <div className={styles.section}>
-                        <div className={styles.sectionLabel}>
-                            Raw Image (1200 × 630)
-                        </div>
+                        <div className={styles.sectionLabel}>Raw Image (1200 × 630)</div>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            key={refreshKey}
-                            src={ogImageUrl}
-                            alt="OG image full size"
-                            className={styles.rawImage}
-                        />
+                        <img key={refreshKey} src={ogImageUrl} alt="OG image full size" className={styles.rawImage} />
                     </div>
 
                     {/* Meta tags */}
