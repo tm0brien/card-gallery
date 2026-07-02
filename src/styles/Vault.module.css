@@ -3,24 +3,24 @@
    ============================================ */
 
 .vault {
-    position: relative;
-    width: 100%;
-    height: 100vh;
-    overflow: hidden;
-    background: var(--bg-gradient-mid);
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-gradient-mid);
 }
 
 .bgLayer {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .canvas {
-    position: absolute !important;
-    inset: 0;
-    z-index: 1;
+  position: absolute !important;
+  inset: 0;
+  z-index: 1;
 }
 
 /* ============================================
@@ -28,14 +28,75 @@
    ============================================ */
 
 .inspectUi {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
 }
 
 .inspectUi > * {
-    pointer-events: auto;
+  pointer-events: auto;
+}
+
+.remixSwipeOverlay {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: min(34vw, 290px);
+  aspect-ratio: 0.72;
+  transform: translate(-50%, -50%);
+  border-radius: 12px;
+  overflow: hidden;
+  pointer-events: none !important;
+  z-index: 24;
+  opacity: 0;
+  animation: remix-swipe-fade 760ms ease-out forwards;
+}
+
+.remixSwipeOverlay[data-orientation="landscape"] {
+  width: min(40vw, 340px);
+  aspect-ratio: 1.42;
+}
+
+.remixSwipeOverlay::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background: linear-gradient(
+    104deg,
+    rgba(164, 234, 255, 0) 0%,
+    rgba(164, 234, 255, 0.06) 34%,
+    rgba(225, 246, 255, 0.88) 48%,
+    rgba(164, 234, 255, 0.06) 62%,
+    rgba(164, 234, 255, 0) 100%
+  );
+  filter: blur(8px);
+  transform: translateX(-115%);
+  animation: remix-swipe-move 760ms cubic-bezier(0.3, 0, 0.2, 1) forwards;
+}
+
+@keyframes remix-swipe-fade {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes remix-swipe-move {
+  0% {
+    transform: translateX(-115%);
+  }
+  100% {
+    transform: translateX(115%);
+  }
 }
 
 /* ============================================
@@ -43,5 +104,5 @@
    ============================================ */
 
 @media (max-width: 640px) {
-    /* InfoPanel and RemixGallery handle their own responsive layout */
+  /* InfoPanel and RemixGallery handle their own responsive layout */
 }

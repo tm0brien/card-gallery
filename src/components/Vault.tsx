@@ -28,11 +28,11 @@ import { clamp01, cubicBezier, lerp } from '../lib/transition/easing'
 import { calculateFitDistance } from '../lib/transition/viewerPose'
 import styles from '../styles/Vault.module.css'
 import type { CardSummary } from '../types/card'
-import RolodexNav from './RolodexNav'
 import CardSlab from './CardSlab'
 import DebugPanel, { type DebugOverrides, kelvinToHex, sphericalToXyz } from './DebugPanel'
 import RemixGallery from './RemixGallery'
 import RemixModal from './RemixModal'
+import RolodexNav from './RolodexNav'
 import ThemeSwitcher from './ThemeSwitcher'
 
 // ---------------------------------------------------------------------------
@@ -40,17 +40,9 @@ import ThemeSwitcher from './ThemeSwitcher'
 // ---------------------------------------------------------------------------
 
 const INSPECT_FOV = 38
+const REMIX_SWIPE_DURATION_MS = 760
 
-/** URL of a card's default/featured remix video, or null when it has none. */
-function defaultVideoUrlFor(card: CardSummary | undefined): string | null {
-    if (!card?.hasAssets || !card.defaultRemixFilename) return null
-    return `/assets/${card.id}/remixes/${card.defaultRemixFilename}`
-}
-
-function setInspectCameraPose(
-    camera: THREE.Camera,
-    size: { width: number; height: number }
-) {
+function setInspectCameraPose(camera: THREE.Camera, size: { width: number; height: number }) {
     const aspect = size.width / size.height
     // Both portrait and landscape cards have equal face area. Fitting to the
     // geometric-mean side (√(w×h)) treats both as an equivalent square, so the
@@ -698,6 +690,18 @@ export default function Vault({
     }, [theme, debugOverrides])
 
     const cards = initialCards
+    const [primaryRemixByCard, setPrimaryRemixByCard] = useState<Record<string, { id?: string; filename?: string }>>(
+        () => {
+            const seed: Record<string, { id?: string; filename?: string }> = {}
+            for (const nextCard of initialCards) {
+                seed[nextCard.id] = {
+                    id: nextCard.defaultRemixId,
+                    filename: nextCard.defaultRemixFilename
+                }
+            }
+            return seed
+        }
+    )
     const [currentIndex, setCurrentIndex] = useState(() => {
         if (initialCardId) {
             const idx = initialCards.findIndex(c => c.id === initialCardId)
@@ -706,16 +710,26 @@ export default function Vault({
         return 0
     })
     const invalidateRef = useRef<() => void>(() => {})
+    const remixStartTimeoutRef = useRef<number | null>(null)
+    const [showRemixSwipe, setShowRemixSwipe] = useState(false)
+
+    const primaryVideoUrlFor = useCallback(
+        (nextCard: CardSummary | undefined): string | null => {
+            if (!nextCard?.hasAssets) return null
+            const primary = primaryRemixByCard[nextCard.id]
+            if (!primary?.filename) return null
+            return `/assets/${nextCard.id}/remixes/${primary.filename}`
+        },
+        [primaryRemixByCard]
+    )
 
     useEffect(() => {
         const c = initialCards[currentIndex]
         if (c) onCardChange?.(c)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentIndex])
 
-    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(() =>
-        defaultVideoUrlFor(initialCards[currentIndex])
-    )
+    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null)
     const [showRemix, setShowRemix] = useState(false)
 
     const card = cards[currentIndex]
@@ -740,7 +754,7 @@ export default function Vault({
             if (idx >= 0) {
                 startTransition(() => {
                     setCurrentIndex(idx)
-                    setActiveVideoUrl(defaultVideoUrlFor(cards[idx]))
+                    setActiveVideoUrl(null)
                 })
                 invalidateRef.current()
             }
@@ -758,12 +772,62 @@ export default function Vault({
             // textures load, instead of suspending to a blank canvas.
             startTransition(() => {
                 setCurrentIndex(index)
-                setActiveVideoUrl(defaultVideoUrlFor(cards[index]))
+                setActiveVideoUrl(null)
             })
             invalidateRef.current()
         },
         [currentIndex, cards]
     )
+
+    useEffect(() => {
+        return () => {
+            if (remixStartTimeoutRef.current != null) {
+                window.clearTimeout(remixStartTimeoutRef.current)
+            }
+        }
+    }, [])
+
+    const handlePlayPrimaryRemix = useCallback(() => {
+        const currentCard = cards[currentIndex]
+        const videoUrl = primaryVideoUrlFor(currentCard)
+        if (!videoUrl) return
+
+        if (remixStartTimeoutRef.current != null) {
+            window.clearTimeout(remixStartTimeoutRef.current)
+        }
+
+        // Always reveal the static scan first so the light sweep cues playback.
+        setActiveVideoUrl(null)
+        setShowRemixSwipe(true)
+        remixStartTimeoutRef.current = window.setTimeout(() => {
+            setActiveVideoUrl(videoUrl)
+            setShowRemixSwipe(false)
+            remixStartTimeoutRef.current = null
+        }, REMIX_SWIPE_DURATION_MS)
+    }, [cards, currentIndex, primaryVideoUrlFor])
+
+    const handlePrimaryRemixChange = useCallback(
+        (cardId: string, remixId: string | null, remixFilename: string | null) => {
+            setPrimaryRemixByCard(prev => ({
+                ...prev,
+                [cardId]: {
+                    id: remixId ?? undefined,
+                    filename: remixFilename ?? undefined
+                }
+            }))
+
+            const currentCard = cards[currentIndex]
+            if (!currentCard || currentCard.id !== cardId) return
+            if (!activeVideoUrl) return
+            const nextUrl = remixFilename ? `/assets/${cardId}/remixes/${remixFilename}` : null
+            if (nextUrl !== activeVideoUrl) {
+                setActiveVideoUrl(nextUrl)
+            }
+        },
+        [cards, currentIndex, activeVideoUrl]
+    )
+
+    const isAdminView = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -797,13 +861,10 @@ export default function Vault({
     // so the background doesn't change until the incoming card starts rotating.
     const pendingCardBgRef = useRef<string | null>(null)
 
-    const makeSpotlightGradient = useCallback(
-        (color: string | undefined | null) => {
-            const { center, mid, edge } = deriveBackgroundGradient(color)
-            return `radial-gradient(circle at 50% 42%, ${center} 0%, ${mid} 45%, ${edge} 100%)`
-        },
-        []
-    )
+    const makeSpotlightGradient = useCallback((color: string | undefined | null) => {
+        const { center, mid, edge } = deriveBackgroundGradient(color)
+        return `radial-gradient(circle at 50% 42%, ${center} 0%, ${mid} 45%, ${edge} 100%)`
+    }, [])
 
     const triggerBgFade = useCallback(
         (next: string) => {
@@ -892,10 +953,7 @@ export default function Vault({
     }
 
     return (
-        <div
-            className={styles.vault}
-            data-theme={themeMode}
-        >
+        <div className={styles.vault} data-theme={themeMode}>
             {themeMode === 'spotlight' && (
                 <>
                     <div ref={bgBottomRef} className={styles.bgLayer} />
@@ -929,6 +987,9 @@ export default function Vault({
             <RolodexNav cards={cards} currentIndex={currentIndex} onSelect={goToCardIndex} />
 
             <div className={styles.inspectUi}>
+                {showRemixSwipe && card?.hasAssets && (
+                    <div className={styles.remixSwipeOverlay} data-orientation={card.orientation ?? 'portrait'} />
+                )}
                 {card?.hasAssets && (
                     <RemixGallery
                         cardId={card.id}
@@ -936,6 +997,12 @@ export default function Vault({
                         onSelectVideo={setActiveVideoUrl}
                         activeVideoUrl={activeVideoUrl}
                         onOpenRemix={() => setShowRemix(true)}
+                        primaryRemixId={primaryRemixByCard[card.id]?.id}
+                        primaryRemixFilename={primaryRemixByCard[card.id]?.filename}
+                        isAdminView={isAdminView}
+                        onPrimaryRemixChange={handlePrimaryRemixChange}
+                        onPlayPrimaryRemix={handlePlayPrimaryRemix}
+                        isPlayingPrimaryTransition={showRemixSwipe}
                     />
                 )}
             </div>

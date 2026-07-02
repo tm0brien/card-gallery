@@ -18,6 +18,12 @@ interface RemixGalleryProps {
     onSelectVideo?: (videoUrl: string | null) => void
     activeVideoUrl?: string | null
     onOpenRemix?: () => void
+    primaryRemixId?: string
+    primaryRemixFilename?: string
+    isAdminView?: boolean
+    onPrimaryRemixChange?: (cardId: string, remixId: string | null, remixFilename: string | null) => void
+    onPlayPrimaryRemix?: () => void
+    isPlayingPrimaryTransition?: boolean
     hidden?: boolean
 }
 
@@ -27,11 +33,18 @@ export default function RemixGallery({
     onSelectVideo,
     activeVideoUrl,
     onOpenRemix,
+    primaryRemixId,
+    primaryRemixFilename,
+    isAdminView = false,
+    onPrimaryRemixChange,
+    onPlayPrimaryRemix,
+    isPlayingPrimaryTransition = false,
     hidden = false
 }: RemixGalleryProps) {
     const [remixes, setRemixes] = useState<RemixEntry[]>([])
     const [active, setActive] = useState<RemixEntry | null>(null)
     const [isOpen, setIsOpen] = useState(false)
+    const [savingPrimaryId, setSavingPrimaryId] = useState<string | null>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     const isLandscape = orientation === 'landscape'
@@ -59,6 +72,50 @@ export default function RemixGallery({
     const hasRemixes = remixes.length > 0
     const imageUrl = `/assets/${cardId}/front.png`
     const basePath = `/assets/${cardId}/remixes`
+    const hasPrimaryVideo = Boolean(primaryRemixFilename)
+
+    const savePrimaryRemix = useCallback(
+        async (entry: RemixEntry | null) => {
+            if (!isAdminView || !onPrimaryRemixChange) return
+            const remixId = entry?.id ?? null
+            const remixFilename = entry?.filename ?? null
+            setSavingPrimaryId(remixId ?? 'clear')
+            try {
+                const res = await fetch('/api/admin/card-meta', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cardId,
+                        defaultRemixId: remixId,
+                        defaultRemixFilename: remixFilename
+                    })
+                })
+                if (!res.ok) throw new Error('Failed to update primary remix')
+                onPrimaryRemixChange(cardId, remixId, remixFilename)
+            } catch {
+                // Ignore save errors for now; admin can retry.
+            } finally {
+                setSavingPrimaryId(null)
+            }
+        },
+        [cardId, isAdminView, onPrimaryRemixChange]
+    )
+
+    if (!isAdminView) {
+        if (!hasPrimaryVideo) return null
+        return (
+            <div className={`${styles.primaryEntry} ${hidden ? 'route-ui-hidden' : ''}`}>
+                <button
+                    className={styles.primaryPlayBtn}
+                    onClick={onPlayPrimaryRemix}
+                    disabled={isPlayingPrimaryTransition}
+                    title="Play primary AI remix"
+                >
+                    {isPlayingPrimaryTransition ? 'Playing intro…' : 'AI Remix'}
+                </button>
+            </div>
+        )
+    }
 
     return (
         <>
@@ -86,6 +143,14 @@ export default function RemixGallery({
                     <button className={styles.remixLink} onClick={onOpenRemix}>
                         + Remix
                     </button>
+                    <button
+                        className={styles.remixLink}
+                        onClick={() => savePrimaryRemix(null)}
+                        disabled={savingPrimaryId === 'clear' || (!primaryRemixId && !primaryRemixFilename)}
+                        title="Clear primary remix"
+                    >
+                        {savingPrimaryId === 'clear' ? 'Clearing…' : 'Clear Primary'}
+                    </button>
 
                     {/* Thumbnails */}
                     {hasRemixes && (
@@ -101,13 +166,18 @@ export default function RemixGallery({
                                     alt="Original"
                                     width={thumbWidth}
                                     height={thumbHeight}
-                                    style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+                                    style={{
+                                        objectFit: 'contain',
+                                        width: '100%',
+                                        height: '100%'
+                                    }}
                                 />
                             </button>
 
                             {remixes.map(r => {
                                 const videoSrc = r.type === 'video' ? `${basePath}/${r.filename}` : null
                                 const isActiveOnCard = videoSrc != null && activeVideoUrl === videoSrc
+                                const isPrimary = r.type === 'video' && r.id === primaryRemixId
 
                                 return (
                                     <button
@@ -128,9 +198,33 @@ export default function RemixGallery({
                                             alt={r.prompt}
                                             width={thumbWidth}
                                             height={thumbHeight}
-                                            style={{ objectFit: 'contain', width: '100%', height: '100%' }}
+                                            style={{
+                                                objectFit: 'contain',
+                                                width: '100%',
+                                                height: '100%'
+                                            }}
                                             unoptimized={r.type === 'image'}
                                         />
+                                        {r.type === 'video' && (
+                                            <span className={styles.thumbMeta}>
+                                                <span className={styles.thumbType}>Video</span>
+                                                <span className={styles.thumbPrimaryMark}>
+                                                    {isPrimary ? 'Primary' : ''}
+                                                </span>
+                                            </span>
+                                        )}
+                                        {r.type === 'video' && !isPrimary && (
+                                            <span
+                                                className={styles.setPrimaryAction}
+                                                onClick={e => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    savePrimaryRemix(r)
+                                                }}
+                                            >
+                                                {savingPrimaryId === r.id ? 'Saving…' : 'Set Primary'}
+                                            </span>
+                                        )}
                                     </button>
                                 )
                             })}
@@ -162,7 +256,11 @@ export default function RemixGallery({
                                     alt={active.prompt}
                                     width={560}
                                     height={780}
-                                    style={{ objectFit: 'contain', width: '100%', height: 'auto' }}
+                                    style={{
+                                        objectFit: 'contain',
+                                        width: '100%',
+                                        height: 'auto'
+                                    }}
                                     unoptimized
                                 />
                             </div>
