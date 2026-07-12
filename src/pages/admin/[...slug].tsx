@@ -9,6 +9,7 @@ import type { VaultHandle } from '@/components/Vault'
 import { isAdminAllowed } from '@/lib/adminAuth'
 import { getCards } from '@/lib/cards'
 import { filterViewableCards } from '@/lib/viewableCards'
+import panelStyles from '@/styles/DebugPanel.module.css'
 import type { CardSummary } from '@/types/card'
 
 const Vault = dynamic(() => import('@/components/Vault'), { ssr: false })
@@ -64,8 +65,10 @@ export default function AdminCard({ cards, initialCardId }: AdminProps) {
                         allowDebugPanel
                         urlBasePath="/admin"
                     />
-                    <GlobalSettingsPanel />
-                    <CardSettingsPanel card={currentCard} vaultRef={vaultRef} activeVideoUrl={activeVideoUrl} />
+                    <div className={panelStyles.panelStack}>
+                        <GlobalSettingsPanel />
+                        <CardSettingsPanel card={currentCard} vaultRef={vaultRef} activeVideoUrl={activeVideoUrl} />
+                    </div>
                 </>
             ) : (
                 <p style={{ padding: 48, color: '#e7e4dd', fontFamily: 'sans-serif' }}>
