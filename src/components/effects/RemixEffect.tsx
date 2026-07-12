@@ -9,7 +9,7 @@ import type { CardOrientation } from '../../lib/cardOrientation'
 import { clamp01 } from '../../lib/transition/easing'
 import ArcaneAwakening from './ArcaneAwakening'
 import HoloIgnition from './HoloIgnition'
-import { type CardFace, REMIX_TIMELINE, REMIX_TIMELINE_REDUCED } from './shaders'
+import { type CardFace, HOLO_TIMELINE, REMIX_TIMELINE, REMIX_TIMELINE_REDUCED } from './shaders'
 
 interface RemixEffectProps {
     style: RemixEffectStyle
@@ -67,7 +67,7 @@ const RemixEffect = memo(function RemixEffect({
         invalidate()
     }, [invalidate])
 
-    const timeline = reducedMotion ? REMIX_TIMELINE_REDUCED : REMIX_TIMELINE
+    const timeline = reducedMotion ? REMIX_TIMELINE_REDUCED : style === 'holo' ? HOLO_TIMELINE : REMIX_TIMELINE
 
     useFrame(() => {
         if (doneRef.current) return

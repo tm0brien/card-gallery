@@ -1,1 +1,36 @@
-{}
+{
+  "night": {
+    "lighting": {
+      "ambientIntensity": 1.44,
+      "keyIntensity": 1.4,
+      "fillIntensity": 0.82,
+      "rimIntensity": 0.52,
+      "keyColor": "#fffefa",
+      "fillColor": "#fffefa",
+      "rimColor": "#fffefa",
+      "keyPosition": [
+        -4.656903154237996,
+        5.433053679944331,
+        6.985354731356996
+      ],
+      "fillPosition": [
+        7.999999999999999,
+        0,
+        6.000000000000001
+      ],
+      "rimPosition": [
+        6.396021490668314,
+        4.26401432711221,
+        -6.396021490668313
+      ]
+    },
+    "motion": {
+      "cardTransitionDuration": 1000,
+      "cardEntryRotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

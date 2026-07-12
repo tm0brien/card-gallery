@@ -8,7 +8,7 @@
 
 import * as THREE from 'three'
 
-/** Timeline (seconds) shared by both effects. */
+/** Timeline (seconds) for the arcane effect. */
 export const REMIX_TIMELINE = {
     /** Charge phase: the effect builds over the static scan. */
     chargeEnd: 1.4,
@@ -16,6 +16,13 @@ export const REMIX_TIMELINE = {
     revealDuration: 0.6,
     /** Total effect lifetime; the effect decays and unmounts at this point. */
     total: 2.2
+} as const
+
+/** Slower, gentler timeline for the holographic edge-glow effect. */
+export const HOLO_TIMELINE = {
+    chargeEnd: 2.4,
+    revealDuration: 0.8,
+    total: 4.0
 } as const
 
 /** Reduced-motion fallback: a quick simple crossfade. */
@@ -103,8 +110,16 @@ void main() {
     float glow = (line + halo) * uGlow * drawn;
     float headGlow = head * uGlow * exp(-abs(d) * 12.0) * 1.6;
 
-    vec3 outCol = col * (glow * 1.7) + col * headGlow * 1.4 + vec3(1.0) * headGlow * 0.4;
-    float alpha = clamp(glow * 1.1 + headGlow, 0.0, 0.9);
+    vec3 outCol;
+    float alpha;
+    if (uMode < 0.5) {
+        // Holographic: soft iridescent edge hint, no hot white pop.
+        outCol = col * glow * 1.05;
+        alpha = clamp(glow * 0.7, 0.0, 0.45);
+    } else {
+        outCol = col * (glow * 1.7) + col * headGlow * 1.4 + vec3(1.0) * headGlow * 0.4;
+        alpha = clamp(glow * 1.1 + headGlow, 0.0, 0.9);
+    }
     gl_FragColor = vec4(outCol, alpha);
 }
 `
