@@ -60,6 +60,61 @@
     flex-shrink: 0;
 }
 
+/* ── Admin: stacked collapsible panels (right side) ── */
+
+.panelStack {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 9999;
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* let clicks in the gaps between panels reach the canvas underneath */
+    pointer-events: none;
+}
+
+.panelStack .panel {
+    position: static;
+    width: 100%;
+    max-height: none;
+    min-height: 0;
+    flex: 0 1 auto;
+    pointer-events: auto;
+}
+
+.panelStack .panelCollapsed {
+    flex: 0 0 auto;
+}
+
+.panelCollapsed .header {
+    border-bottom: none;
+}
+
+.collapseToggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.collapseChevron {
+    font-size: 8px;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.35);
+    transition: transform 0.15s;
+}
+
+.collapseChevronCollapsed {
+    transform: rotate(-90deg);
+}
+
 .headerTitle {
     font-size: 10px;
     font-weight: 600;
@@ -594,6 +649,165 @@
     font-size: 9.5px;
     color: #ff8f7a;
     padding: 2px 0 4px;
+}
+
+/* ── Admin: AI remix section ── */
+
+.remixHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.newRemixBtn {
+    padding: 4px 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.9);
+    color: #16140f;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.newRemixBtn:hover {
+    background: #fff;
+}
+
+.remixThumbGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.remixThumb {
+    position: relative;
+    width: 72px;
+    height: 96px;
+    padding: 0;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.12s;
+}
+.remixThumb:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+.remixThumbActive {
+    border-color: #7ac8ff;
+    box-shadow: 0 0 0 1px rgba(122, 200, 255, 0.4);
+}
+
+.remixThumbMeta {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    pointer-events: none;
+}
+
+.remixThumbType {
+    font-size: 7.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.55);
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
+.remixPrimaryBadge {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    font-size: 7.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #16140f;
+    background: #7ac8ff;
+    padding: 1px 4px;
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.remixSetPrimaryBtn {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    font-size: 7.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 1px 5px;
+    cursor: pointer;
+}
+.remixSetPrimaryBtn:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.remixActions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.remixOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.remixOverlayContent {
+    position: relative;
+    max-width: 560px;
+    width: 100%;
+}
+
+.remixOverlayClose {
+    position: absolute;
+    top: -34px;
+    right: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.remixPrompt {
+    margin: 10px 0 0;
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.55);
+    line-height: 1.5;
+    text-align: center;
 }
 
 /* ── Footer ── */

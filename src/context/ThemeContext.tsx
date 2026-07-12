@@ -2,6 +2,7 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
+import { DEFAULT_APP_SETTINGS, isRemixEffectStyle, type RemixEffectStyle } from '../config/appSettings'
 import { defaultTheme, getTheme, ThemeConfig, ThemeMode } from '../config/theme'
 import { applyThemeOverride, ThemeOverrideEntry, ThemeOverridesMap } from '../config/themeOverrides'
 
@@ -28,6 +29,10 @@ interface ThemeContextValue {
     /** Transient spotlight background color override for admin live preview. */
     previewSpotlightColor: string | null
     setPreviewSpotlightColor: (color: string | null) => void
+    /** Which cinematic intro plays when a visitor presses "AI Remix". */
+    remixEffectStyle: RemixEffectStyle
+    /** Mirror a successful admin save of the remix effect style. */
+    setRemixEffectStyle: (style: RemixEffectStyle) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
@@ -38,6 +43,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const [overrides, setOverrides] = useState<ThemeOverridesMap>({})
     const [previewOverride, setPreviewOverride] = useState<PreviewOverride | null>(null)
     const [previewSpotlightColor, setPreviewSpotlightColor] = useState<string | null>(null)
+    const [remixEffectStyle, setRemixEffectStyle] = useState<RemixEffectStyle>(DEFAULT_APP_SETTINGS.remixEffectStyle)
 
     // Load saved theme preference on mount
     useEffect(() => {
@@ -55,6 +61,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             .then(res => (res.ok ? res.json() : {}))
             .then((data: ThemeOverridesMap) => {
                 if (!cancelled && data && typeof data === 'object') setOverrides(data)
+            })
+            .catch(() => undefined)
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    // Load admin-authored global app settings (e.g. the remix intro style).
+    useEffect(() => {
+        let cancelled = false
+        fetch('/data/app-settings.json')
+            .then(res => (res.ok ? res.json() : null))
+            .then((data: unknown) => {
+                if (cancelled || !data || typeof data !== 'object') return
+                const style = (data as Record<string, unknown>).remixEffectStyle
+                if (isRemixEffectStyle(style)) setRemixEffectStyle(style)
             })
             .catch(() => undefined)
         return () => {
@@ -160,7 +182,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 setSavedOverride,
                 setPreviewOverride,
                 previewSpotlightColor,
-                setPreviewSpotlightColor
+                setPreviewSpotlightColor,
+                remixEffectStyle,
+                setRemixEffectStyle
             }}
         >
             {children}

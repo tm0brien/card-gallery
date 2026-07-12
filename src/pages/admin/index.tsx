@@ -1,12 +1,15 @@
 import type { GetServerSideProps } from 'next'
 import dynamic from 'next/dynamic'
 import Head from 'next/head'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
-import AdminThemePanel from '@/components/admin/AdminThemePanel'
+import CardSettingsPanel from '@/components/admin/CardSettingsPanel'
+import GlobalSettingsPanel from '@/components/admin/GlobalSettingsPanel'
+import type { VaultHandle } from '@/components/Vault'
 import { isAdminAllowed } from '@/lib/adminAuth'
 import { getCards } from '@/lib/cards'
 import { filterViewableCards } from '@/lib/viewableCards'
+import panelStyles from '@/styles/DebugPanel.module.css'
 import type { CardSummary } from '@/types/card'
 
 const Vault = dynamic(() => import('@/components/Vault'), { ssr: false })
@@ -31,6 +34,11 @@ export default function Admin({ cards, initialCardId }: AdminProps) {
     const [currentCard, setCurrentCard] = useState<CardSummary | null>(
         () => cards.find(c => c.id === initialCardId) ?? cards[0] ?? null
     )
+    const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null)
+    const vaultRef = useRef<VaultHandle | null>(null)
+    const handleVaultReady = useCallback((handle: VaultHandle) => {
+        vaultRef.current = handle
+    }, [])
 
     return (
         <>
@@ -45,8 +53,15 @@ export default function Admin({ cards, initialCardId }: AdminProps) {
                         cards={cards}
                         initialCardId={initialCardId}
                         onCardChange={setCurrentCard}
+                        onActiveVideoUrlChange={setActiveVideoUrl}
+                        onVaultReady={handleVaultReady}
+                        allowDebugPanel
+                        urlBasePath="/admin"
                     />
-                    <AdminThemePanel card={currentCard} />
+                    <div className={panelStyles.panelStack}>
+                        <GlobalSettingsPanel />
+                        <CardSettingsPanel card={currentCard} vaultRef={vaultRef} activeVideoUrl={activeVideoUrl} />
+                    </div>
                 </>
             ) : (
                 <p style={{ padding: 48, color: '#e7e4dd', fontFamily: 'sans-serif' }}>

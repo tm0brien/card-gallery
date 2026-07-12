@@ -16,9 +16,11 @@ import {
 } from 'react'
 import * as THREE from 'three'
 
+import type { RemixEffectStyle } from '../config/appSettings'
 import { type AtmosphereConfig, type ThemeConfig } from '../config/theme'
 import { useTheme } from '../context/ThemeContext'
 import { useCompositedVideoTexture } from '../hooks/useCompositedVideoTexture'
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import { deriveBackgroundGradient } from '../lib/backgroundGradient'
 import { CARD_AREA_MEAN_SIDE, getCardDimensions } from '../lib/cardDimensions'
 import type { CardOrientation } from '../lib/cardOrientation'
@@ -30,8 +32,8 @@ import styles from '../styles/Vault.module.css'
 import type { CardSummary } from '../types/card'
 import CardSlab from './CardSlab'
 import DebugPanel, { type DebugOverrides, kelvinToHex, sphericalToXyz } from './DebugPanel'
+import RemixEffect from './effects/RemixEffect'
 import RemixGallery from './RemixGallery'
-import RemixModal from './RemixModal'
 import RolodexNav from './RolodexNav'
 import ThemeSwitcher from './ThemeSwitcher'
 
@@ -40,7 +42,12 @@ import ThemeSwitcher from './ThemeSwitcher'
 // ---------------------------------------------------------------------------
 
 const INSPECT_FOV = 38
-const REMIX_SWIPE_DURATION_MS = 760
+
+/** A remix intro currently playing (or about to play) on the active card. */
+interface RemixIntro {
+    style: RemixEffectStyle
+    videoUrl: string
+}
 
 function setInspectCameraPose(camera: THREE.Camera, size: { width: number; height: number }) {
     const aspect = size.width / size.height
@@ -110,19 +117,23 @@ const DisplayCard = memo(function DisplayCard({
     theme,
     activeVideoUrl,
     opacityRef,
+    revealRef,
     onReady
 }: {
     card: CardSummary
     theme: ThemeConfig
     activeVideoUrl: string | null
     opacityRef?: React.MutableRefObject<number>
+    revealRef?: React.MutableRefObject<number>
     onReady?: () => void
 }) {
     const assetPath = `/assets/${card.id}`
     const videoTexture = useCompositedVideoTexture(
         card.hasAssets ? activeVideoUrl : null,
         `${assetPath}/front.png`,
-        `${assetPath}/mask.png`
+        `${assetPath}/mask.png`,
+        3,
+        revealRef
     )
 
     // Fires only once this card's subtree (including its suspended textures)
@@ -170,18 +181,6 @@ interface TransitionController {
     exitRotation: [number, number, number]
 }
 
-function usePrefersReducedMotion() {
-    const [reduced, setReduced] = useState(false)
-    useEffect(() => {
-        const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-        setReduced(mq.matches)
-        const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
-        mq.addEventListener('change', handler)
-        return () => mq.removeEventListener('change', handler)
-    }, [])
-    return reduced
-}
-
 function applyRenderOrder(group: THREE.Group | null, order: number) {
     if (!group) return
     group.traverse(obj => {
@@ -212,11 +211,13 @@ const CardCrossfade = memo(function CardCrossfade({
     card,
     theme,
     activeVideoUrl,
+    revealRef,
     onEntryStartRef
 }: {
     card: CardSummary
     theme: ThemeConfig
     activeVideoUrl: string | null
+    revealRef?: React.MutableRefObject<number>
     onEntryStartRef: RefObject<() => void>
 }) {
     const { invalidate, camera } = useThree()
@@ -378,6 +379,7 @@ const CardCrossfade = memo(function CardCrossfade({
                         theme={theme}
                         activeVideoUrl={activeVideoUrl}
                         opacityRef={incomingOpacity}
+                        revealRef={revealRef}
                         onReady={handleIncomingReady}
                     />
                 </Suspense>
@@ -583,17 +585,26 @@ function VaultScene({
     currentIndex,
     theme,
     activeVideoUrl,
+    remixIntro,
+    remixRevealRef,
+    onRemixReveal,
+    onRemixComplete,
     onEntryStartRef
 }: {
     cards: CardSummary[]
     currentIndex: number
     theme: ThemeConfig
     activeVideoUrl: string | null
+    remixIntro: RemixIntro | null
+    remixRevealRef: React.MutableRefObject<number>
+    onRemixReveal: () => void
+    onRemixComplete: () => void
     onEntryStartRef: RefObject<() => void>
 }) {
     const { atmosphere } = theme
     const card = cards[currentIndex]
     const orientation = card?.orientation ?? 'portrait'
+    const reducedMotion = usePrefersReducedMotion()
 
     return (
         <>
@@ -610,10 +621,25 @@ function VaultScene({
                         card={card}
                         theme={theme}
                         activeVideoUrl={activeVideoUrl}
+                        revealRef={remixRevealRef}
                         onEntryStartRef={onEntryStartRef}
                     />
                     {/* Keyed so the one-frame shadow bake re-runs per card/theme */}
                     <SlabShadow key={`shadow-${card.id}-${theme.name}`} theme={theme} orientation={orientation} />
+                    {remixIntro && card.hasAssets && (
+                        <Suspense fallback={null}>
+                            <RemixEffect
+                                key={`${card.id}-${remixIntro.videoUrl}-${remixIntro.style}`}
+                                style={remixIntro.style}
+                                cardId={card.id}
+                                orientation={orientation}
+                                reducedMotion={reducedMotion}
+                                revealRef={remixRevealRef}
+                                onReveal={onRemixReveal}
+                                onComplete={onRemixComplete}
+                            />
+                        </Suspense>
+                    )}
                 </>
             )}
 
@@ -626,16 +652,46 @@ function VaultScene({
 // Vault — the main exported component
 // ---------------------------------------------------------------------------
 
-export default function Vault({
-    cards: initialCards,
-    initialCardId,
-    onCardChange
-}: {
+/** Imperative controls handed to admin panels via `onVaultReady`, so the
+ *  card-specific settings panel can preview remixes / update the primary
+ *  remix directly on the live 3D viewer without lifting all of Vault's
+ *  internal state. (Passed as a callback rather than a ref because Vault is
+ *  loaded through `next/dynamic`.) */
+export interface VaultHandle {
+    /** Preview a remix video on the current card, or pass null to restore the original scan. */
+    previewVideo: (url: string | null) => void
+    /** Update which remix is the "primary" one for a card (mirrors a successful admin save). */
+    setPrimaryRemix: (cardId: string, remixId: string | null, remixFilename: string | null) => void
+}
+
+interface VaultProps {
     cards: CardSummary[]
     initialCardId?: string | null
     onCardChange?: (card: CardSummary) => void
-}) {
-    const { theme, themeMode, setThemeMode, previewSpotlightColor } = useTheme()
+    /** Notifies the parent whenever the previewed/active remix video changes. */
+    onActiveVideoUrlChange?: (url: string | null) => void
+    /** Hands the parent a stable set of imperative controls (see VaultHandle). */
+    onVaultReady?: (handle: VaultHandle) => void
+    /** Shows the (dev-only) visual-tuning debug panel. Only ever passed by admin routes. */
+    allowDebugPanel?: boolean
+    /**
+     * Base path used when syncing the browser URL to the current card (e.g. "/card" or
+     * "/admin"). Keeps admin routes on /admin/[id] as you browse, instead of drifting onto
+     * the public /card/[id] URL while the admin panels are still showing.
+     */
+    urlBasePath?: string
+}
+
+export default function Vault({
+    cards: initialCards,
+    initialCardId,
+    onCardChange,
+    onActiveVideoUrlChange,
+    onVaultReady,
+    allowDebugPanel = false,
+    urlBasePath = '/card'
+}: VaultProps) {
+    const { theme, themeMode, setThemeMode, previewSpotlightColor, remixEffectStyle } = useTheme()
 
     const [debugOverrides, setDebugOverrides] = useState<DebugOverrides | null>(null)
 
@@ -710,8 +766,11 @@ export default function Vault({
         return 0
     })
     const invalidateRef = useRef<() => void>(() => {})
-    const remixStartTimeoutRef = useRef<number | null>(null)
-    const [showRemixSwipe, setShowRemixSwipe] = useState(false)
+    const [remixIntro, setRemixIntro] = useState<RemixIntro | null>(null)
+    // Video dissolve progress (0 → 1), written by RemixEffect each frame and
+    // read by the composited video texture. Rests at 1 (instant reveal) so
+    // admin previews and normal playback behave as before.
+    const remixRevealRef = useRef(1)
 
     const primaryVideoUrlFor = useCallback(
         (nextCard: CardSummary | undefined): string | null => {
@@ -730,7 +789,10 @@ export default function Vault({
     }, [currentIndex])
 
     const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null)
-    const [showRemix, setShowRemix] = useState(false)
+
+    useEffect(() => {
+        onActiveVideoUrlChange?.(activeVideoUrl)
+    }, [activeVideoUrl, onActiveVideoUrlChange])
 
     const card = cards[currentIndex]
 
@@ -740,28 +802,32 @@ export default function Vault({
 
     useEffect(() => {
         if (!card) return
-        const path = `/card/${card.id}`
+        const path = `${urlBasePath}/${card.id}`
         if (window.location.pathname !== path) {
             window.history.pushState({}, '', path)
         }
-    }, [card])
+    }, [card, urlBasePath])
 
     useEffect(() => {
+        const escapedBasePath = urlBasePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const urlPattern = new RegExp(`^${escapedBasePath}/([^/]+)`)
         const syncFromUrl = () => {
-            const match = window.location.pathname.match(/^\/card\/([^/]+)/)
+            const match = window.location.pathname.match(urlPattern)
             if (!match) return
             const idx = cards.findIndex(c => c.id === match[1])
             if (idx >= 0) {
                 startTransition(() => {
                     setCurrentIndex(idx)
                     setActiveVideoUrl(null)
+                    setRemixIntro(null)
                 })
+                remixRevealRef.current = 1
                 invalidateRef.current()
             }
         }
         window.addEventListener('popstate', syncFromUrl)
         return () => window.removeEventListener('popstate', syncFromUrl)
-    }, [cards])
+    }, [cards, urlBasePath])
 
     const goToCardIndex = useCallback(
         (index: number) => {
@@ -773,38 +839,34 @@ export default function Vault({
             startTransition(() => {
                 setCurrentIndex(index)
                 setActiveVideoUrl(null)
+                setRemixIntro(null)
             })
+            remixRevealRef.current = 1
             invalidateRef.current()
         },
         [currentIndex, cards]
     )
-
-    useEffect(() => {
-        return () => {
-            if (remixStartTimeoutRef.current != null) {
-                window.clearTimeout(remixStartTimeoutRef.current)
-            }
-        }
-    }, [])
 
     const handlePlayPrimaryRemix = useCallback(() => {
         const currentCard = cards[currentIndex]
         const videoUrl = primaryVideoUrlFor(currentCard)
         if (!videoUrl) return
 
-        if (remixStartTimeoutRef.current != null) {
-            window.clearTimeout(remixStartTimeoutRef.current)
-        }
-
-        // Always reveal the static scan first so the light sweep cues playback.
+        // Reveal the static scan first; the in-scene effect charges over it,
+        // then cues the video (with a dissolve) at its reveal beat.
         setActiveVideoUrl(null)
-        setShowRemixSwipe(true)
-        remixStartTimeoutRef.current = window.setTimeout(() => {
-            setActiveVideoUrl(videoUrl)
-            setShowRemixSwipe(false)
-            remixStartTimeoutRef.current = null
-        }, REMIX_SWIPE_DURATION_MS)
-    }, [cards, currentIndex, primaryVideoUrlFor])
+        remixRevealRef.current = 0
+        setRemixIntro({ style: remixEffectStyle, videoUrl })
+    }, [cards, currentIndex, primaryVideoUrlFor, remixEffectStyle])
+
+    const handleRemixReveal = useCallback(() => {
+        if (remixIntro) setActiveVideoUrl(remixIntro.videoUrl)
+    }, [remixIntro])
+
+    const handleRemixComplete = useCallback(() => {
+        remixRevealRef.current = 1
+        setRemixIntro(null)
+    }, [])
 
     const handlePrimaryRemixChange = useCallback(
         (cardId: string, remixId: string | null, remixFilename: string | null) => {
@@ -827,7 +889,18 @@ export default function Vault({
         [cards, currentIndex, activeVideoUrl]
     )
 
-    const isAdminView = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')
+    useEffect(() => {
+        onVaultReady?.({
+            previewVideo: (url: string | null) => {
+                // Admin previews bypass the intro: cancel any running effect
+                // and show the video (or scan) immediately.
+                setRemixIntro(null)
+                remixRevealRef.current = 1
+                setActiveVideoUrl(url)
+            },
+            setPrimaryRemix: handlePrimaryRemixChange
+        })
+    }, [onVaultReady, handlePrimaryRemixChange])
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -979,6 +1052,10 @@ export default function Vault({
                         currentIndex={currentIndex}
                         theme={liveTheme}
                         activeVideoUrl={activeVideoUrl}
+                        remixIntro={remixIntro}
+                        remixRevealRef={remixRevealRef}
+                        onRemixReveal={handleRemixReveal}
+                        onRemixComplete={handleRemixComplete}
                         onEntryStartRef={onEntryStartRef}
                     />
                 </Suspense>
@@ -987,39 +1064,21 @@ export default function Vault({
             <RolodexNav cards={cards} currentIndex={currentIndex} onSelect={goToCardIndex} />
 
             <div className={styles.inspectUi}>
-                {showRemixSwipe && card?.hasAssets && (
-                    <div className={styles.remixSwipeOverlay} data-orientation={card.orientation ?? 'portrait'} />
-                )}
                 {card?.hasAssets && (
                     <RemixGallery
                         cardId={card.id}
                         orientation={card.orientation ?? 'portrait'}
-                        onSelectVideo={setActiveVideoUrl}
-                        activeVideoUrl={activeVideoUrl}
-                        onOpenRemix={() => setShowRemix(true)}
-                        primaryRemixId={primaryRemixByCard[card.id]?.id}
                         primaryRemixFilename={primaryRemixByCard[card.id]?.filename}
-                        isAdminView={isAdminView}
-                        onPrimaryRemixChange={handlePrimaryRemixChange}
                         onPlayPrimaryRemix={handlePlayPrimaryRemix}
-                        isPlayingPrimaryTransition={showRemixSwipe}
+                        isPlayingPrimaryTransition={remixIntro != null}
                     />
                 )}
             </div>
 
             <ThemeSwitcher themeMode={themeMode} setThemeMode={setThemeMode} />
 
-            {process.env.NODE_ENV !== 'production' && (
+            {process.env.NODE_ENV !== 'production' && allowDebugPanel && (
                 <DebugPanel theme={theme} onOverridesChange={setDebugOverrides} />
-            )}
-
-            {showRemix && card?.hasAssets && (
-                <RemixModal
-                    cardId={card.id}
-                    cardTitle={card.title}
-                    gradeLabel={`${card.grade.company} ${card.grade.score}`}
-                    onClose={() => setShowRemix(false)}
-                />
             )}
         </div>
     )

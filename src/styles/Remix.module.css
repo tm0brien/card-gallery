@@ -137,7 +137,12 @@
 .toolBar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.toolBar:last-of-type {
   margin-bottom: 16px;
 }
 
@@ -190,6 +195,26 @@
   height: 8px;
   border-radius: 50%;
   background: rgba(255, 100, 100, 0.9);
+}
+
+.shapeIconRound {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.shapeIconSquare {
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.shapeIconSelect {
+  width: 9px;
+  height: 9px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.75);
+  box-sizing: border-box;
 }
 
 .saveBtn {
@@ -423,6 +448,9 @@
 }
 
 .segmentBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 12px;
   background: transparent;
   border: none;

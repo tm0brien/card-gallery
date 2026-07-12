@@ -30,7 +30,9 @@
     "backgroundColor": "#498bb9"
   },
   "1955-hank-aaron-bowman-bvg-5-5": {
-    "backgroundColor": "#2e170f"
+    "backgroundColor": "#2e170f",
+    "defaultRemixId": "1774540843162",
+    "defaultRemixFilename": "1774540843162-video.mp4"
   },
   "1955-willie-mays-bowman-bvg-7": {
     "backgroundColor": "#6b524a"

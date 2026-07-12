@@ -18,7 +18,13 @@ export function useCompositedVideoTexture(
     videoUrl: string | null,
     frontImageUrl: string,
     maskUrl: string,
-    feather: number = 3
+    feather: number = 3,
+    /**
+     * Optional dissolve progress (0 → 1). While < 1 the video is blended over
+     * the still scan at that opacity, letting the remix intro effect reveal
+     * the video softly instead of a hard cut. Omit for an instant reveal.
+     */
+    revealRef?: { current: number }
 ): THREE.CanvasTexture | null {
     const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null)
     const stateRef = useRef<CompositeState | null>(null)
@@ -165,20 +171,26 @@ export function useCompositedVideoTexture(
         const w = canvas.width
         const h = canvas.height
 
+        const reveal = revealRef ? Math.min(1, Math.max(0, revealRef.current)) : 1
+
         ctx.drawImage(frontImg, 0, 0, w, h)
 
-        if (alphaMask) {
-            const tc = tmpCanvas.getContext('2d')!
-            tc.clearRect(0, 0, w, h)
-            tc.drawImage(video, 0, 0, w, h)
-            tc.globalCompositeOperation = 'destination-in'
-            if (f > 0) tc.filter = `blur(${f}px)`
-            tc.drawImage(alphaMask, 0, 0, w, h)
-            tc.filter = 'none'
-            tc.globalCompositeOperation = 'source-over'
-            ctx.drawImage(tmpCanvas, 0, 0)
-        } else {
-            ctx.drawImage(video, 0, 0, w, h)
+        if (reveal > 0) {
+            ctx.globalAlpha = reveal
+            if (alphaMask) {
+                const tc = tmpCanvas.getContext('2d')!
+                tc.clearRect(0, 0, w, h)
+                tc.drawImage(video, 0, 0, w, h)
+                tc.globalCompositeOperation = 'destination-in'
+                if (f > 0) tc.filter = `blur(${f}px)`
+                tc.drawImage(alphaMask, 0, 0, w, h)
+                tc.filter = 'none'
+                tc.globalCompositeOperation = 'source-over'
+                ctx.drawImage(tmpCanvas, 0, 0)
+            } else {
+                ctx.drawImage(video, 0, 0, w, h)
+            }
+            ctx.globalAlpha = 1
         }
 
         tex.needsUpdate = true
