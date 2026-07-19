@@ -12,7 +12,13 @@ fs.mkdirSync(outDir, { recursive: true })
 const browser = await puppeteer.launch({
     executablePath: '/usr/local/bin/google-chrome',
     headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=1920,1400']
+    args: [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--use-angle=swiftshader',
+        '--enable-unsafe-swiftshader',
+        '--window-size=1920,1400'
+    ]
 })
 const page = await browser.newPage()
 await page.setViewport({ width: 1920, height: 1400 })
