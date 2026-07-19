@@ -25,7 +25,12 @@ export const BACKGROUND_OPTIONS: Array<{ id: BackgroundKind; label: string }> = 
  * approximates the existing "study" card-viewer backdrop (see
  * src/config/theme.ts) with a slight lift so transmission stays readable.
  */
-export function paintBackground(ctx: CanvasRenderingContext2D, width: number, height: number, kind: BackgroundKind): void {
+export function paintBackground(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    kind: BackgroundKind
+): void {
     switch (kind) {
         case 'white':
             ctx.fillStyle = '#ffffff'
@@ -87,9 +92,7 @@ export function backgroundCss(kind: BackgroundKind): string {
         case 'brown':
             return 'radial-gradient(ellipse at center, #3a2f24 0%, #221b13 55%, #0c0b09 100%)'
         case 'checker':
-            return (
-                'repeating-conic-gradient(#e8e8e8 0% 25%, #202020 0% 50%) ' + '50% / 40px 40px'
-            )
+            return 'repeating-conic-gradient(#e8e8e8 0% 25%, #202020 0% 50%) ' + '50% / 40px 40px'
     }
 }
 

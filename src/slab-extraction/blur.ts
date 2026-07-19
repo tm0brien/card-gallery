@@ -9,7 +9,14 @@
 import type { FloatImage } from './types'
 
 /** Box-blur one axis with a running-sum sliding window. */
-function boxBlurPass(src: Float32Array, dst: Float32Array, width: number, height: number, radius: number, horizontal: boolean): void {
+function boxBlurPass(
+    src: Float32Array,
+    dst: Float32Array,
+    width: number,
+    height: number,
+    radius: number,
+    horizontal: boolean
+): void {
     const lineCount = horizontal ? height : width
     const lineLength = horizontal ? width : height
     const stride = horizontal ? 1 : width
@@ -43,7 +50,8 @@ function boxRadiiForGaussian(sigma: number, passes: number): number[] {
     let lower = Math.floor(idealWidth)
     if (lower % 2 === 0) lower--
     const upper = lower + 2
-    const idealPasses = (12 * sigma * sigma - passes * lower * lower - 4 * passes * lower - 3 * passes) / (-4 * lower - 4)
+    const idealPasses =
+        (12 * sigma * sigma - passes * lower * lower - 4 * passes * lower - 3 * passes) / (-4 * lower - 4)
     const threshold = Math.round(idealPasses)
     const radii: number[] = []
     for (let i = 0; i < passes; i++) {
@@ -64,7 +72,7 @@ export function gaussianBlur(image: FloatImage, radius: number): FloatImage {
 
     const radii = boxRadiiForGaussian(radius, 3)
     const scratch = new Float32Array(width * height)
-    let current = result.data
+    const current = result.data
     for (const r of radii) {
         const boxRadius = Math.round(r)
         if (boxRadius <= 0) continue

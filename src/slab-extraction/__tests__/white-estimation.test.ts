@@ -15,7 +15,9 @@ describe('estimateScannerWhite', () => {
     it('ignores dark corners (seams/shadows) via the brightest-half median', () => {
         // Bottom half dark, top half white — like a scan whose lower corners
         // land on molded seams.
-        const image = makeRgbaImage(200, 300, (x, y) => (y > 150 ? { r: 0.2, g: 0.2, b: 0.2 } : { r: 0.94, g: 0.94, b: 0.94 }))
+        const image = makeRgbaImage(200, 300, (x, y) =>
+            y > 150 ? { r: 0.2, g: 0.2, b: 0.2 } : { r: 0.94, g: 0.94, b: 0.94 }
+        )
         const white = estimateScannerWhite(image)
         expect(white.r).toBeGreaterThan(0.85)
     })

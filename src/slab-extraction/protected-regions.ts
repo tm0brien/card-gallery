@@ -14,7 +14,14 @@ import type { FloatImage, NormalizedRect, ProtectedRegionsConfig } from './types
  * Signed coverage of a single rect with linear feathering: 1 fully inside,
  * fading to 0 across `featherPx` pixels centered on the rect boundary.
  */
-function rectCoverage(px: number, py: number, rect: NormalizedRect, width: number, height: number, featherPx: number): number {
+function rectCoverage(
+    px: number,
+    py: number,
+    rect: NormalizedRect,
+    width: number,
+    height: number,
+    featherPx: number
+): number {
     if (rect.width <= 0 || rect.height <= 0) return 0
     const left = rect.x * width
     const top = rect.y * height

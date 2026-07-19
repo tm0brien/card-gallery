@@ -53,7 +53,10 @@ export function computeSignedDetail(
  * Split signed detail into independent highlight (positive) and shadow
  * (negative) maps with thresholds, gains, denoise and an optional final blur.
  */
-export function splitDetail(signedDetail: FloatImage, config: DetailConfig): { highlight: FloatImage; shadow: FloatImage } {
+export function splitDetail(
+    signedDetail: FloatImage,
+    config: DetailConfig
+): { highlight: FloatImage; shadow: FloatImage } {
     const { width, height, data } = signedDetail
     const highlightData = new Float32Array(data.length)
     const shadowData = new Float32Array(data.length)

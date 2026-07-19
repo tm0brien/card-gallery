@@ -46,7 +46,9 @@ export const DEFAULT_CONFIG: SlabExtractionConfig = {
         fresnelPower: 3.0,
         detailHeadOnStrength: 0.25,
         detailGrazingStrength: 1.0,
-        envIntensity: 0.8
+        // RoomEnvironment has a hot overhead panel; keep reflections gentle so
+        // the smooth front face doesn't white out at neutral poses.
+        envIntensity: 0.3
     }
 }
 
