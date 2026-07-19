@@ -10,6 +10,8 @@
     "sync-cards": "tsx --env-file=.env.local scripts/sync-from-sheets.ts",
     "normalize-scans": "tsx scripts/normalize-card-scans.ts",
     "optimize-textures": "tsx scripts/optimize-textures.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "predev": "npm run sync-cards",
     "prebuild": "npm run sync-cards"
   },
@@ -42,6 +44,7 @@
     "prettier-eslint": "^16.4.2",
     "sharp": "^0.34.5",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }
